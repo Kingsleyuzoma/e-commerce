@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/Components/shop/Navbar";
 import { CartProvider } from "@/Context/CartContext";
 import CartDrawer from "@/Components/shop/CartDrawer";
+import { AuthProvider } from "@/Context/AuthContext";
 
 
 const geistSans = Geist({
@@ -32,12 +33,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <AuthProvider>
       <CartProvider>
         <Navbar />
         
           {children}
         <CartDrawer />
       </CartProvider>
+      </AuthProvider>
       </body>
     </html>
   );

@@ -2,17 +2,23 @@
 "use client";
 
 import ProductCard from '@/Components/shop/ProductCard';
+import { useAuth } from '@/Context/AuthContext';
 
 import { useCart } from '@/Context/CartContext';
 
 export default function HomePage() {
   // 🪝 Grab the live products state from context (which already contains your products with stock)
   const { products } = useCart();
+  const { isAdmin } = useAuth();
 
   return (
     <>
       {/* 🧭 Top Navigation Bar so users can see their cart count */}
-     
+     {isAdmin && (
+  <div className="bg-red-600 text-white p-2 text-center font-bold">
+    ⚠️ Admin Mode Active
+  </div>
+)}
       
       <main className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-7xl mx-auto">

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -66,7 +67,7 @@ const CartDrawer: React.FC = () => {
                     <img 
                       src={item.product.imageUrl || "/placeholder.jpg"} 
                       alt={item.product.name} 
-                      className='w-20 h-20 object-cover rounded-lg bg-gray-100 flex-shrink-0' 
+                      className='w-20 h-20 object-cover rounded-lg bg-gray-100 shrink-0' 
                     />
                      
                     {/* 📝 Product Info & Controls */}
@@ -97,7 +98,7 @@ const CartDrawer: React.FC = () => {
                           >
                             ➖
                           </button>
-                          <span className='px-3 py-1 text-sm font-medium text-gray-900 bg-gray-50 min-w-[32px] text-center'>
+                          <span className='px-3 py-1 text-sm font-medium text-gray-900 bg-gray-50 min-w-8 text-center'>
                             {item.quantity}
                           </span>
                           <button 
@@ -123,11 +124,15 @@ const CartDrawer: React.FC = () => {
                 ${totalPrice.toFixed(2)}
               </span>
             </div>
+
+            
+            {cart.length > 0 && (
             <Link href='/checkout' className='w-full' onClick={() => setIsCartOpen(false)}>
               <button className='w-full bg-pink-600 text-white py-3 px-4 rounded-xl text-lg font-semibold hover:bg-pink-700 transition-colors shadow-sm'>
                 Proceed to Checkout
               </button>
             </Link>
+            )}
           </div>
 
         </div>

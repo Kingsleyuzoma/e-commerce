@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/Context/CartContext';
+import { useAuth } from '@/Context/AuthContext'; // 🔑 Import your global auth hook
 
 const PRODUCT_CATEGORIES = [
   { name: 'All Products', href: '/products' },
@@ -11,16 +12,16 @@ const PRODUCT_CATEGORIES = [
   { name: 'Makeup', href: '/products/makeup' },
   { name: 'Perfumes', href: '/products/perfumes' },
   { name: 'Apparel & Sneakers', href: '/products/apparel' },
+  { name: 'Accessories', href: '/products/accessories' },
 ];
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
-  // This is a placeholder for our future Firebase auth state
-  const [user, setUser] = useState<{ email: string } | null>(null);
-
-  const { getCartCount, isCartOpen, setIsCartOpen } = useCart();
+  // 🔌 Connect your live global authentication states
+  const { user, isAdmin, logout } = useAuth();
+  const { getCartCount, setIsCartOpen } = useCart();
 
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
@@ -39,6 +40,16 @@ const Navbar = () => {
             </Link>
 
             {/* Products Dropdown Trigger */}
+            <Link href="/contact" className="text-sm font-medium text-gray-700 hover:text-pink-600 transition-colors">
+              Contact
+            </Link>
+
+            {/* Conditional Admin Link */}
+            {user && isAdmin && (
+              <Link href="/admin" className="text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors">
+                Admin
+              </Link>
+            )}
             <div 
               className="relative"
               onMouseEnter={() => setIsDropdownOpen(true)}
@@ -78,20 +89,26 @@ const Navbar = () => {
               <span className="absolute top-1 right-1 bg-pink-600 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center scale-90">{getCartCount()}</span>
             </button>
 
+            {/* 🔄 Dynamic Desktop Auth Interface */}
             {user ? (
               <button 
-                onClick={() => setUser(null)} 
+                onClick={logout} 
                 className="text-sm font-medium text-gray-700 hover:text-rose-600 transition-colors"
               >
                 Sign Out
               </button>
             ) : (
-              <button 
-                onClick={() => setUser({ email: 'user@test.com' })} 
-                className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors shadow-sm"
-              >
-                Sign In
-              </button>
+              <div className="flex items-center space-x-3">
+                <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-pink-600 transition-colors">
+                  Login
+                </Link>
+                <Link 
+                  href="/signup" 
+                  className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors shadow-sm"
+                >
+                  Sign Up
+                </Link>
+              </div>
             )}
           </div>
 
@@ -108,7 +125,6 @@ const Navbar = () => {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 text-gray-600 hover:text-pink-600 focus:outline-none"
             >
-                
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -139,12 +155,23 @@ const Navbar = () => {
           </div>
           
           <Link href="/contact" className="block py-2 text-base font-medium text-gray-700 hover:text-pink-600">Contact</Link>
-          
-          <div className="pt-4 border-t border-gray-100">
+
+          {/* Conditional Admin Link */}
+          {user && isAdmin && (
+            <Link href="/admin" className="block py-2 text-base font-medium text-pink-600 hover:text-pink-700">
+              Admin Dashboard
+            </Link>
+          )}
+
+          {/* 🔄 Dynamic Mobile Auth Interface */}
+          <div className="pt-4 border-t border-gray-100 space-y-2">
             {user ? (
-              <button onClick={() => setUser(null)} className="w-full text-center bg-gray-100 text-gray-700 py-2 rounded-lg font-medium">Sign Out</button>
+              <button onClick={logout} className="w-full text-center bg-gray-100 text-gray-700 py-2 rounded-lg font-medium">Sign Out</button>
             ) : (
-              <button onClick={() => setUser({ email: 'user@test.com' })} className="w-full text-center bg-pink-600 text-white py-2 rounded-lg font-semibold">Sign In</button>
+              <>
+                <Link href="/login" className="block w-full text-center bg-gray-100 text-gray-700 py-2 rounded-lg font-medium">Login</Link>
+                <Link href="/signup" className="block w-full text-center bg-pink-600 text-white py-2 rounded-lg font-semibold">Sign Up</Link>
+              </>
             )}
           </div>
         </div>
