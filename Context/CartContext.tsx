@@ -1,7 +1,11 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Product } from '@/Components/shop/ProductCard';
+// 📡 Bring in Firestore functions and your database configuration
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/config/firebase"; 
 
 export interface CartItem {
   product: Product;
@@ -10,11 +14,11 @@ export interface CartItem {
 
 interface CartContextType {
   cart: CartItem[];
-  products: Product[]; // 📦 Expose products array to the app
+  products: Product[]; // 📦 Central source of truth for live products
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
-  decreaseStock: (cartItems: CartItem[]) => void; // 📉 Added so checkout can trigger it
+  decreaseStock: (cartItems: CartItem[]) => void; // 📉 Triggered post-checkout
   clearCart: () => void;
   getCartCount: () => number;
   isCartOpen: boolean;
@@ -29,49 +33,32 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoaded, setIsLoaded] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // 📦 Global centralized source of truth for items & available stock
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: '1',
-      name: '24" HD Lace Frontal Body Wave Wig',
-      brand: 'Femel Hair',
-      description: 'Premium quality 100% human hair wig with pre-plucked hairline and invisible HD lace.',
-      price: 350.00,
-      salePrice: 299.99,
-      category: 'Hair',
-      isNew: true,
-      imageUrl: '',
-      availableStock: 10
-    },
-    {
-      id: '2',
-      name: 'Matte Liquid Lipstick - Crimson Velvet',
-      brand: 'Femel Beauty',
-      description: 'Long-lasting, smudge-proof liquid lipstick with a hydrating matte finish.',
-      price: 22.00,
-      category: 'Makeup',
-      isNew: false,
-      imageUrl: '',
-      availableStock: 6
-    },
-    {
-      id: '3',
-      name: 'Oversized Satin Varsity Jacket',
-      brand: 'Femel Apparel',
-      description: 'Comfortable and stylish satin jacket featuring embroidered details and premium lining.',
-      price: 85.00,
-      category: 'Apparel',
-      isNew: true,
-      imageUrl: '',
-      availableStock: 7
-    }
-  ]);
+  // 📦 Initialize products as an empty array to await live database items
+  const [products, setProducts] = useState<Product[]>([]);
+
+  // 📥 Fetch live products from the Firestore "products" collection on load
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const fetchedProducts = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Product[];
+        
+        setProducts(fetchedProducts);
+      } catch (error) {
+        console.error("Error fetching products from Firestore: ", error);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // 📉 Deduct stock quantities post-checkout
   const decreaseStock = (cartItems: CartItem[]) => {
     setProducts((prevProducts) => {
       return prevProducts.map((product) => {
-        // Look inside item.product.id rather than item.id
         const cartItem = cartItems.find((item) => item.product.id === product.id);
         if (cartItem) {
           return { ...product, availableStock: Math.max(0, product.availableStock - cartItem.quantity) };
@@ -110,22 +97,25 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cart, isLoaded]);
 
-  // 📝 Add to Cart with automated Toast Trigger
- // 📝 Add to Cart with strict stock boundaries and a toast trigger
+  // 📝 Add to Cart with strict stock boundaries and a toast trigger
   const addToCart = (product: Product) => {
+    // 🔍 Find the fresh product data from our source of truth
+    const freshProduct = products.find(p => p.id === product.id);
     let stockIsAvailable = true;
+
+    // 🛡️ Safety check: if the product wasn't found in our master list, fallback safely
+    if (!freshProduct) return;
 
     setCart((prevCart) => {
       const existingItem = prevCart.find(item => item.product.id === product.id);
       
       if (existingItem) {
-        // 🔒 Guardrail: Check if adding 1 more exceeds available stock
-        if (existingItem.quantity >= product.availableStock) {
+        // 🔒 Guardrail: Check if adding 1 more exceeds live available stock
+        if (existingItem.quantity >= freshProduct.availableStock) {
           stockIsAvailable = false;
-          return prevCart; // Return unchanged cart if out of stock
+          return prevCart;
         }
         
-        // ✨ Clean increment: Map through and add EXACTLY 1 to the item quantity
         return prevCart.map(item => 
           item.product.id === product.id 
             ? { ...item, quantity: item.quantity + 1 }
@@ -133,17 +123,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
       }
       
-      // 🔒 Guardrail: Check if the product itself has stock before initial add
-      if (product.availableStock <= 0) {
+      // 🔒 Guardrail: Check if the fresh product itself has stock before initial add
+      if (freshProduct.availableStock <= 0) {
         stockIsAvailable = false;
         return prevCart;
       }
 
-      // Add fresh item with quantity 1
       return [...prevCart, { product, quantity: 1 }];
     });
 
-    // 💥 Toast Notification Sequence (Only fires if stock check passed!)
+    // 💥 Toast Notification Sequence
     if (stockIsAvailable) {
       setToastMessage(`Added "${product.name}" to your cart! 🛒`);
       setShowToast(true);
@@ -154,29 +143,36 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       toastTimeoutRef.current = setTimeout(() => {
         setShowToast(false);
-      }, 3000);
+      }, 1000);
     } else {
-      alert(`Sorry, you cannot add more "${product.name}". It has reached its stock limit! 📦`);
+      setToastMessage(`Sorry, you cannot add more "${product.name}". It has reached its stock limit! 📦`);
+      setShowToast(true);
     }
   };
+
   const removeFromCart = (productId: string) => {
     setCart((prevCart) => prevCart.filter(item => item.product.id !== productId));
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
-    // 🗑️ User specified: if quantity reaches 0, vanish from view entirely
     if (quantity <= 0) {
       removeFromCart(productId);
       return;
     }
 
+    // 🔍 Find the fresh product data from our source of truth
+    const freshProduct = products.find(p => p.id === productId);
+
     setCart((prevCart) => {
       return prevCart.map((item) => {
         if (item.product.id === productId) {
-          // 🔒 Safety Lock: Check if the requested quantity exceeds available inventory
-          if (quantity > item.product.availableStock) {
-            alert(`Sorry, you have reached the maximum available limit (${item.product.availableStock}) for this item! 📦`);
-            return item; // Keep the quantity right where it is
+          // 🛡️ Safety check: if product metadata isn't found in master list, keep item intact
+          if (!freshProduct) return item;
+
+          // 🔒 Safety Lock: Check if the requested quantity exceeds live available inventory
+          if (quantity > freshProduct.availableStock) {
+            alert(`Sorry, you have reached the maximum available limit (${freshProduct.availableStock}) for this item! 📦`);
+            return item;
           }
           return { ...item, quantity };
         }
@@ -197,11 +193,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <CartContext.Provider value={{ 
       cart, 
-      products, // 🔑 Added here so components can read it!
+      products, 
       addToCart, 
       removeFromCart, 
       updateQuantity, 
-      decreaseStock, // 🔑 Added here so checkout view can call it!
+      decreaseStock, 
       clearCart, 
       getCartCount, 
       getTotalPrice, 

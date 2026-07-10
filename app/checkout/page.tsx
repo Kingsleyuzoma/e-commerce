@@ -9,11 +9,8 @@ import { useAuth } from '@/Context/AuthContext'; // 🔑 Import your global auth
 
 export default function CheckoutPage() {
   const { cart, getTotalPrice, updateQuantity, removeFromCart, clearCart, decreaseStock } = useCart();
-  const { user, login} = useAuth()
+  const { user, login } = useAuth();
   const router = useRouter();
-
-  
-
 
   // 📝 Form States
   const [shippingData, setShippingData] = useState({
@@ -39,8 +36,8 @@ export default function CheckoutPage() {
     if (error) setError('');
   };
 
-  // 🏁 Process Complete Order
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  // 🏁 Process Complete Order (Now Asynchronous)
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // 🔒 1. Check Shipping
@@ -61,13 +58,19 @@ export default function CheckoutPage() {
       return;
     }
 
-    // 💥 Success Sequence
-    decreaseStock(cart);
-    clearCart();
-    router.push("/checkout/success");
+    try {
+      // 💥 Success Sequence
+      // ⏳ Wait for Firestore to permanently deduct stock numbers before wiping local states
+      await decreaseStock(cart);
+      clearCart();
+      router.push("/checkout/success");
+    } catch (err) {
+      console.error("Checkout transaction failed: ", err);
+      setError("An inventory error occurred while processing your order. Please try again.");
+    }
   };
 
-  // 🔒 Step 3: Add the authentication guard layer right here!
+  // 🔒 Step 3: Authentication guard layer
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
@@ -78,14 +81,10 @@ export default function CheckoutPage() {
             Please sign in to your account to complete your order.
           </p>
           <Link href="/login" className="w-full block">
-          <button
-            //onClick={login}
-            className="w-full bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm mb-4"
-            >
-              
-            Sign In Instantly
-          </button>
-           </Link>
+            <button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm mb-4">
+              Sign In Instantly
+            </button>
+          </Link>
           <p className="text-xs text-gray-400">
             Don't have an account?{' '}
             <Link href="/signup" className="text-pink-600 font-medium hover:underline">
@@ -96,9 +95,6 @@ export default function CheckoutPage() {
       </div>
     );
   }
-
-
-
 
   if (cart.length === 0) {
     return (
@@ -239,7 +235,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* ⚖️ Terms and Conditions Interactive Tick Box */}
+              {/* ⚖️ Terms and Conditions Tick Box */}
               <div className="pt-2 flex items-start gap-2.5">
                 <input 
                   type="checkbox" 
@@ -272,35 +268,22 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* 🔮 TERMS AND CONDITIONS POP-UP MODAL OVERLAY */}
+      {/* 🔮 TERMS AND CONDITIONS MODAL */}
       {isTermsModalOpen && (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[70vh] flex flex-col shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Modal Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-gray-900">Terms and Conditions</h3>
-              <button 
-                onClick={() => setIsTermsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1"
-              >
-                ✕
-              </button>
+              <button onClick={() => setIsTermsModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1">✕</button>
             </div>
-
-            {/* Modal Content Scrollbox */}
             <div className="p-6 overflow-y-auto space-y-4 text-sm text-gray-600 leading-relaxed">
               <p className="font-semibold text-gray-800">1. Order Processing & Acceptance</p>
               <p>By clicking "Place Order", you agree that all stock counts and processed inventory deductions are final representations of point-of-sale layout confirmations.</p>
-              
               <p className="font-semibold text-gray-800">2. Mock Payment Protocols</p>
               <p>This store is handling standard validation flows. All details entered into card configurations are validated locally on client device layouts and are not captured maliciously.</p>
-              
               <p className="font-semibold text-gray-800">3. Shipping Policies</p>
               <p>Estimated timelines are standard mock calculations subject to live fulfillment settings once database pipelines are active.</p>
             </div>
-
-            {/* Modal Action Footer */}
             <div className="p-4 bg-gray-50 border-t border-gray-100 rounded-b-2xl flex justify-end">
               <button
                 onClick={() => {
@@ -312,7 +295,6 @@ export default function CheckoutPage() {
                 Accept and Close
               </button>
             </div>
-
           </div>
         </div>
       )}

@@ -40,6 +40,7 @@ export const addProduct = async (
       brand: productData.brand,
       price: parseFloat(productData.price),
       salePercentage: productData.salePercentage ? parseInt(productData.salePercentage) : 0,
+      availableStock: productData.availableStock ? parseInt(productData.availableStock) : 0,
       imageUrl: downloadUrl,
       tags: productData.tags.split(",").map((tag: string) => tag.trim()),
       isNewArrival: productData.isNewArrival,

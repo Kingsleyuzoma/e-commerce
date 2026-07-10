@@ -11,6 +11,7 @@ export default function AddProductPage() {
     brand: "",
     price: "",
     salePercentage: "",
+    availableStock: "", // 📦 Added to track initial inventory quantity
     imageFile: null as File | null,
     tags: "",
     isNewArrival: false,
@@ -45,6 +46,7 @@ export default function AddProductPage() {
         brand: "",
         price: "",
         salePercentage: "",
+        availableStock: "", // ✨ Resets the stock field
         imageFile: null,
         tags: "",
         isNewArrival: false,
@@ -104,8 +106,8 @@ export default function AddProductPage() {
           </div>
         </div>
 
-        {/* 💰 Price & 📉 Sale Percentage */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* 💰 Price, 📉 Sale Percentage, & 📦 Available Stock */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
             <input
@@ -120,7 +122,7 @@ export default function AddProductPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sale Percentage (%)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sale (%)</label>
             <input
               type="number"
               min="0"
@@ -129,6 +131,19 @@ export default function AddProductPage() {
               placeholder="0 (Optional)"
               value={formData.salePercentage}
               onChange={(e) => setFormData({ ...formData, salePercentage: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Stock Quantity</label>
+            <input
+              type="number"
+              min="0"
+              required
+              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-pink-500 focus:outline-none"
+              placeholder="0"
+              value={formData.availableStock}
+              onChange={(e) => setFormData({ ...formData, availableStock: e.target.value })}
             />
           </div>
         </div>

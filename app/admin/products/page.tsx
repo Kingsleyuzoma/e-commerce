@@ -12,6 +12,7 @@ type Product = {
   category: string;
   brand: string;
   price: number;
+  availableStock: number; // 📦 Track the inventory count safely
   imageUrl?: string;
 };
 
@@ -36,6 +37,7 @@ export default function ProductsPage() {
             category: data.category || "",
             brand: data.brand || "",
             price: data.price || 0,
+            availableStock: data.availableStock || 0, // 📥 Pull stock data from Firestore
             imageUrl: data.imageUrl || "",
           });
         });
@@ -83,13 +85,14 @@ export default function ProductsPage() {
               <th className="p-3">Category</th>
               <th className="p-3">Brand</th>
               <th className="p-3">Price</th>
+              <th className="p-3">Stock</th> {/* 📊 Column header for stock */}
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {displayedProducts.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-gray-400">
+                <td colSpan={8} className="p-8 text-center text-gray-400">
                   No products found. Use the admin form to upload your first item! 🛍️
                 </td>
               </tr>
@@ -107,7 +110,6 @@ export default function ProductsPage() {
                           alt={product.name} 
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            // Fallback if the image URL fails to load
                             (e.target as HTMLImageElement).src = "/placeholder-image.jpg";
                           }}
                         />
@@ -118,6 +120,7 @@ export default function ProductsPage() {
                     <td className="p-3">{product.category}</td>
                     <td className="p-3">{product.brand}</td>
                     <td className="p-3">${product.price.toFixed(2)}</td>
+                    <td className="p-3 font-semibold">{product.availableStock}</td> {/* 📦 Display actual stock number */}
                     <td className="p-3">
                       <div className="flex gap-2">
                         <button className="text-blue-600 hover:underline text-sm font-medium">Edit</button>
