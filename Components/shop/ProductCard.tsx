@@ -1,3 +1,4 @@
+
 "use client";
 import { useCart } from '@/Context/CartContext';
 import React from 'react';
@@ -13,6 +14,8 @@ export interface Product {
   isNew: boolean;
   imageUrl: string;
   availableStock: number;
+  colors?: string[]; // 🎨 Supported colors array
+  sizes?: string[];  // 📏 Supported sizes array
 }
 
 interface ProductCardProps {
@@ -20,13 +23,11 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const { addToCart, cart } = useCart(); // 👈 Added 'cart' here to inspect active item quantities
+  const { addToCart, cart } = useCart();
   
-  // 🔍 Find if this specific product is already in the cart, and get its quantity
   const cartItem = cart.find(item => item.product.id === product.id);
   const currentQuantityInCart = cartItem ? cartItem.quantity : 0;
   
-  // 🚫 Determine if the item is entirely sold out OR if the user has hoarded all available stock
   const isSoldOut = product.availableStock <= 0;
   const isMaxStockReached = currentQuantityInCart >= product.availableStock;
 
@@ -70,6 +71,35 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {product.description}
         </p>
 
+        {/* 🎨 Variations Previews (Colors & Sizes) */}
+        <div className="space-y-2 mb-4">
+          {product.colors && product.colors.length > 0 && (
+            <div className="flex gap-1 items-center flex-wrap">
+              <span className="text-[10px] text-gray-400 font-medium">Colors:</span>
+              <div className="flex gap-1 flex-wrap">
+                {product.colors.map(color => (
+                  <span key={color} className="text-[10px] px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-600">
+                    {color}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {product.sizes && product.sizes.length > 0 && (
+            <div className="flex gap-1 items-center flex-wrap">
+              <span className="text-[10px] text-gray-400 font-medium">Sizes:</span>
+              <div className="flex gap-1 flex-wrap">
+                {product.sizes.map(size => (
+                  <span key={size} className="text-[10px] px-1.5 py-0.5 font-bold text-gray-700 bg-gray-50 border border-gray-100 rounded">
+                    {size}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 💰 Pricing Logic & Stock Tracking */}
         <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
           <div>
@@ -88,7 +118,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               </span>
             )}
             
-            {/* 📦 Live Stock Track Info Display */}
             <p className="text-sm text-gray-500 mt-1">
               In Stock: {product.availableStock ?? 0}
             </p>
@@ -99,7 +128,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </span>
         </div>
 
-        {/* 🛒 Add to Cart Button with dynamic disabled states */}
+        {/* 🛒 Add to Cart Button */}
         <button
           onClick={() => addToCart(product)}
           disabled={isSoldOut || isMaxStockReached}

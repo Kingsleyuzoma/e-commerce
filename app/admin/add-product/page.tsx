@@ -1,24 +1,49 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { addProduct } from "@/config/firebaseAction";
+import { db } from "@/config/firebase";
+import { collection, onSnapshot, query } from "firebase/firestore";
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 export default function AddProductPage() {
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
+    category: "", 
     brand: "",
     price: "",
     salePercentage: "",
-    availableStock: "", // 📦 Added to track initial inventory quantity
+    availableStock: "", 
     imageFile: null as File | null,
     tags: "",
+    colors: "", // 🎨 Tracks optional color inputs
+    sizes: "",  // 📏 Tracks optional size inputs
     isNewArrival: false,
   });
 
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number>(0); // 📊 Progress state
+  const [uploadProgress, setUploadProgress] = useState<number>(0); 
+
+  useEffect(() => {
+    const q = query(collection(db, 'Product Categories'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const categoriesArray = snapshot.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name,
+        slug: doc.data().slug
+      }));
+      setCategories(categoriesArray);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,10 +54,28 @@ export default function AddProductPage() {
     }
 
     setIsLoading(true);
-    setUploadProgress(0); // Reset progress tracker
+    setUploadProgress(0); 
 
-    // 🚀 Call backend action with the progress callback function
-    const result = await addProduct(formData, formData.imageFile, (progress) => {
+    // 🧹 Convert comma-separated strings into arrays, or empty arrays if blank
+    const processedColors = formData.colors.trim() 
+      ? formData.colors.split(",").map((c) => c.trim()) 
+      : [];
+
+    const processedSizes = formData.sizes.trim() 
+      ? formData.sizes.split(",").map((s) => s.trim()) 
+      : [];
+
+    const productData = {
+      ...formData,
+      price: Number(formData.price) || 0,
+      salePercentage: Number(formData.salePercentage) || 0,
+      availableStock: Number(formData.availableStock) || 0,
+      tags: formData.tags.trim() ? formData.tags.split(",").map((t) => t.trim()) : [],
+      colors: processedColors,
+      sizes: processedSizes,
+    };
+
+    const result = await addProduct(productData, formData.imageFile, (progress) => {
       setUploadProgress(progress);
     });
 
@@ -46,11 +89,13 @@ export default function AddProductPage() {
         brand: "",
         price: "",
         salePercentage: "",
-        availableStock: "", // ✨ Resets the stock field
+        availableStock: "", 
         imageFile: null,
         tags: "",
+        colors: "", // 🧹 Clears field on success
+        sizes: "",  // 🧹 Clears field on success
         isNewArrival: false,
-      });
+  });
     } else {
       alert("Failed to add product. Please try again.");
     }
@@ -85,11 +130,11 @@ export default function AddProductPage() {
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
             >
               <option value="">Select Category</option>
-              <option value="Wigs & Hair">Wigs & Hair</option>
-              <option value="Makeup">Makeup</option>
-              <option value="Perfumes">Perfumes</option>
-              <option value="Apparel & Sneakers">Apparel & Sneakers</option>
-              <option value="Accessories">Accessories</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.slug}>
+                  {cat.name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -172,6 +217,30 @@ export default function AddProductPage() {
             placeholder="e.g., new-arrival, silky, waterproof"
             value={formData.tags}
             onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+          />
+        </div>
+
+        {/* 🎨 Colors */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Colors (comma separated, optional)</label>
+          <input
+            type="text"
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-pink-500 focus:outline-none"
+            placeholder="e.g., Black, Honey Blonde, Burgundy"
+            value={formData.colors}
+            onChange={(e) => setFormData({ ...formData, colors: e.target.value })}
+          />
+        </div>
+
+        {/* 📏 Sizes */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Sizes (comma separated, optional)</label>
+          <input
+            type="text"
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-pink-500 focus:outline-none"
+            placeholder="e.g., 12 inch, 14 inch, Short, Medium"
+            value={formData.sizes}
+            onChange={(e) => setFormData({ ...formData, sizes: e.target.value })}
           />
         </div>
 

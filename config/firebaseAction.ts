@@ -42,7 +42,9 @@ export const addProduct = async (
       salePercentage: productData.salePercentage ? parseInt(productData.salePercentage) : 0,
       availableStock: productData.availableStock ? parseInt(productData.availableStock) : 0,
       imageUrl: downloadUrl,
-      tags: productData.tags.split(",").map((tag: string) => tag.trim()),
+      tags: productData.tags.map((tag: string) => tag.trim()),
+      colors: productData.colors,
+      sizes: productData.sizes,
       isNewArrival: productData.isNewArrival,
       createdAt: new Date(),
     });

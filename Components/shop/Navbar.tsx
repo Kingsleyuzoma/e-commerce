@@ -1,27 +1,48 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/Context/CartContext';
-import { useAuth } from '@/Context/AuthContext'; // 🔑 Import your global auth hook
+import { useAuth } from '@/Context/AuthContext'; 
+import { db } from '@/config/firebase'; 
+import { collection, onSnapshot, query } from 'firebase/firestore';
 
-const PRODUCT_CATEGORIES = [
-  { name: 'All Products', href: '/products' },
-  { name: 'Wigs & Hair', href: '/products/hair' },
-  { name: 'Makeup', href: '/products/makeup' },
-  { name: 'Perfumes', href: '/products/perfumes' },
-  { name: 'Apparel & Sneakers', href: '/products/apparel' },
-  { name: 'Accessories', href: '/products/accessories' },
-];
+interface NavCategory {
+  name: string;
+  href: string;
+}
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
-  // 🔌 Connect your live global authentication states
+  // 🗂️ Live categories state initialized with 'All Products'
+  const [categories, setCategories] = useState<NavCategory[]>([
+    { name: 'All Products', href: '/products' }
+  ]);
+  
   const { user, isAdmin, logout } = useAuth();
   const { getCartCount, setIsCartOpen } = useCart();
+
+  // 📡 Real-time listener for the navbar categories dropdown
+  useEffect(() => {
+    const q = query(collection(db, 'Product Categories'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const dynamicCategories = snapshot.docs.map(doc => ({
+        name: doc.data().name,
+        href: `/products/${doc.data().slug}`
+      }));
+      
+      // Merge 'All Products' with the database results
+      setCategories([
+        { name: 'All Products', href: '/products' },
+        ...dynamicCategories
+      ]);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
@@ -40,16 +61,6 @@ const Navbar = () => {
             </Link>
 
             {/* Products Dropdown Trigger */}
-            <Link href="/contact" className="text-sm font-medium text-gray-700 hover:text-pink-600 transition-colors">
-              Contact
-            </Link>
-
-            {/* Conditional Admin Link */}
-            {user && isAdmin && (
-              <Link href="/admin" className="text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors">
-                Admin
-              </Link>
-            )}
             <div 
               className="relative"
               onMouseEnter={() => setIsDropdownOpen(true)}
@@ -63,7 +74,7 @@ const Navbar = () => {
               {/* Dropdown Menu Overlay */}
               {isDropdownOpen && (
                 <div className="absolute left-0 mt-0 w-52 bg-white border border-gray-100 rounded-lg shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
-                  {PRODUCT_CATEGORIES.map((category) => (
+                  {categories.map((category) => (
                     <Link
                       key={category.name}
                       href={category.href}
@@ -79,52 +90,40 @@ const Navbar = () => {
             <Link href="/contact" className="text-sm font-medium text-gray-700 hover:text-pink-600 transition-colors">
               Contact
             </Link>
+
+            {/* Conditional Admin Link */}
+            {user && isAdmin && (
+              <Link href="/admin" className="text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors">
+                Admin
+              </Link>
+            )}
           </div>
 
           {/* Auth Buttons & Cart (Desktop Right) */}
           <div className="hidden md:flex items-center space-x-4">
-            {/* Shopping Cart Button */}
             <button onClick={() => setIsCartOpen(true)} className="p-2 text-gray-600 hover:text-pink-600 transition-colors relative">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
               <span className="absolute top-1 right-1 bg-pink-600 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center scale-90">{getCartCount()}</span>
             </button>
 
-            {/* 🔄 Dynamic Desktop Auth Interface */}
             {user ? (
-              <button 
-                onClick={logout} 
-                className="text-sm font-medium text-gray-700 hover:text-rose-600 transition-colors"
-              >
-                Sign Out
-              </button>
+              <button onClick={logout} className="text-sm font-medium text-gray-700 hover:text-rose-600 transition-colors">Sign Out</button>
             ) : (
               <div className="flex items-center space-x-3">
-                <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-pink-600 transition-colors">
-                  Login
-                </Link>
-                <Link 
-                  href="/signup" 
-                  className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors shadow-sm"
-                >
-                  Sign Up
-                </Link>
+                <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-pink-600 transition-colors">Login</Link>
+                <Link href="/signup" className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors shadow-sm">Sign Up</Link>
               </div>
             )}
           </div>
 
-          {/* Mobile Menu Button (Hamburger) */}
+          {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center space-x-4">
-            
-            {/* Always visible mobile Cart */}
             <button onClick={() => setIsCartOpen(true)} className="p-2 text-gray-600 hover:text-pink-600 relative">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
               <span className="absolute top-1 right-1 bg-pink-600 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center scale-90">{getCartCount()}</span>
             </button>
             
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 text-gray-600 hover:text-pink-600 focus:outline-none"
-            >
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 hover:text-pink-600 focus:outline-none">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -146,7 +145,7 @@ const Navbar = () => {
           <div className="py-2">
             <span className="text-xs font-bold uppercase text-gray-400 tracking-wider">Categories</span>
             <div className="mt-1 pl-3 border-l border-pink-100 space-y-1">
-              {PRODUCT_CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <Link key={category.name} href={category.href} className="block py-1.5 text-sm text-gray-600 hover:text-pink-600">
                   {category.name}
                 </Link>
@@ -156,14 +155,10 @@ const Navbar = () => {
           
           <Link href="/contact" className="block py-2 text-base font-medium text-gray-700 hover:text-pink-600">Contact</Link>
 
-          {/* Conditional Admin Link */}
           {user && isAdmin && (
-            <Link href="/admin" className="block py-2 text-base font-medium text-pink-600 hover:text-pink-700">
-              Admin Dashboard
-            </Link>
+            <Link href="/admin" className="block py-2 text-base font-medium text-pink-600 hover:text-pink-700">Admin Dashboard</Link>
           )}
 
-          {/* 🔄 Dynamic Mobile Auth Interface */}
           <div className="pt-4 border-t border-gray-100 space-y-2">
             {user ? (
               <button onClick={logout} className="w-full text-center bg-gray-100 text-gray-700 py-2 rounded-lg font-medium">Sign Out</button>
