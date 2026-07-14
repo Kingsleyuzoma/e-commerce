@@ -1,9 +1,8 @@
-
 "use client";
-import { db, storage } from "@/config/firebase"; // 📝 Ensured storage is imported
+import { db } from "@/config/firebase"; 
 import React, { useState, useEffect } from "react";
 import { collection, addDoc, getDocs } from "firebase/firestore";
-import { uploadProductImage } from "@/config/firebaseAction" // 📤 Imported your upload function
+import { uploadProductImage } from "@/config/firebaseAction";
 
 interface SizeVariant {
   size: string | number;
@@ -15,7 +14,6 @@ interface ColorVariant {
   sizes: SizeVariant[];
 }
 
-// 📐 Define the category interface
 interface CategoryItem {
   id: string;
   name: string;
@@ -26,7 +24,7 @@ export default function AdminProductForm() {
   // 🗃️ Core Form State
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
-  const [category, setCategory] = useState(""); // Stores selected category slug/name
+  const [category, setCategory] = useState(""); 
   const [description, setDescription] = useState(""); 
   const [price, setPrice] = useState("");
   const [salePercentage, setSalePercentage] = useState("");
@@ -39,19 +37,24 @@ export default function AdminProductForm() {
   const [colorName, setColorName] = useState("");
   const [sizeName, setSizeName] = useState("");
   const [stockQty, setStockQty] = useState("");
+  
+  // 📦 Non-variant Base Stock State
+  const [baseStock, setBaseStock] = useState(""); 
 
-  // 📁 Dynamic Categories from Category Manager
+  // 🔒 Submission Loading Lock State
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  // 📁 Dynamic Categories
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
   // 🖼️ Image Upload State
-  const [imageFile, setImageFile] = useState<File | null>(null); // 💾 Track raw file bytes
+  const [imageFile, setImageFile] = useState<File | null>(null); 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   let uploadInterval: NodeJS.Timeout;
 
-  // 📥 Fetch live categories from your category collection on mount
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -63,7 +66,6 @@ export default function AdminProductForm() {
           fetchedCats.push({
             id: doc.id,
             name: data.name || "",
-            // Fallback to safe format if no specific slug field exists
             slug: data.slug || data.name?.toLowerCase().replace(/\s+/g, "-") || "",
           });
         });
@@ -85,33 +87,26 @@ export default function AdminProductForm() {
 
     clearInterval(uploadInterval);
     setUploadProgress(0);
-
-    // 💾 Store the actual file for submission
     setImageFile(file);
 
     const previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
     
     let currentProgress = 0;
-
     uploadInterval = setInterval(() => {
       currentProgress += 20;
-      
       if (currentProgress >= 100) {
         setUploadProgress(100);
         clearInterval(uploadInterval);
-
         setTimeout(() => {
           setUploadProgress(null);
         }, 1000);
-        
       } else {
         setUploadProgress(currentProgress);
       }
     }, 150);
   };
 
-  // 📐 Step 1: Add size to current working color
   const [tempSizes, setTempSizes] = useState<SizeVariant[]>([]);
   const handleAddSize = () => {
     if (!sizeName || !stockQty) return alert("Enter size and stock!");
@@ -124,7 +119,6 @@ export default function AdminProductForm() {
     setStockQty("");
   };
 
-  // 🎨 Step 2: Save complete color group to global list
   const handleSaveColorGroup = () => {
     if (!colorName || tempSizes.length === 0) return alert("Add a color and at least one size!");
     
@@ -137,59 +131,60 @@ export default function AdminProductForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 🛑 Basic validation
+    // Prevent double clicks if already processing
+    if (isPublishing) return;
+
     if (!name || !price || !description || !category) {
       alert("Please fill out the required core fields (Name, Category, Price, and Description).");
       return;
     }
 
-    // 📷 Mandatory image validation
     if (!imageFile) {
       alert("Please select and upload a product image before publishing.");
       return;
     }
 
-    if (variants.length === 0) {
-      alert("Please add at least one color variant with sizes before publishing.");
-      return;
-    }
-
-    try {
-      // 📤 1. Upload raw file to Firebase Storage and retrieve public URL
-      const permanentImageUrl = await uploadProductImage(imageFile, (progress) => {
-        // Optional: Connect to a production progress indicator if needed later
-      });
-
-      // 🧮 Automatically calculate total stock from all nested variants
-      const totalStock = variants.reduce(
+    let totalStock = 0;
+    if (variants.length > 0) {
+      totalStock = variants.reduce(
         (total, v) => total + v.sizes.reduce((sum, s) => sum + s.stock, 0),
         0
       );
+    } else {
+      if (!baseStock || parseInt(baseStock, 10) < 0) {
+        alert("Please either add color variants or specify the 'Base Stock Quantity' below.");
+        return;
+      }
+      totalStock = parseInt(baseStock, 10);
+    }
 
-      // 🧼 Clean up data for the Firestore payload
+    try {
+      setIsPublishing(true); // 🔒 Lock form submission immediately
+
+      const permanentImageUrl = await uploadProductImage(imageFile, () => {});
+
       const finalPayload = {
         name,
         brand,
-        category, // Value stored is the slug/name chosen from the dropdown list
+        category, 
         description, 
         price: parseFloat(price),
         salePercentage: isOnSale ? parseInt(salePercentage, 10) || 0 : 0,
         tags: tags.split(",").map(t => t.trim()).filter(Boolean),
         isNew,
         isOnSale,
-        imageUrl: permanentImageUrl, // 🔗 Use the permanent storage URL
-        variants,
+        imageUrl: permanentImageUrl, 
+        variants: variants || [], 
         availableStock: totalStock,
         createdAt: new Date(), 
       };
 
-      // 🔥 Send data to Firestore collection named "products"
       const docRef = await addDoc(collection(db, "products"), finalPayload);
-      
       console.log("Document written with ID: ", docRef.id);
+      
       alert("🎉 Product successfully published to Firestore!");
 
-      // 🧹 Reset form fields
+      // 🧹 Reset Form
       setName("");
       setBrand("");
       setCategory("");
@@ -200,12 +195,15 @@ export default function AdminProductForm() {
       setIsNew(false);
       setIsOnSale(false);
       setVariants([]);
+      setBaseStock("");
       setImageFile(null);
       setImagePreview(null);
 
     } catch (error) {
       console.error("Error adding document to Firestore: ", error);
       alert("❌ Failed to save product. Check console for details.");
+    } finally {
+      setIsPublishing(false); // 🔓 Release lock
     }
   };
 
@@ -213,11 +211,11 @@ export default function AdminProductForm() {
     <form onSubmit={handleSubmit} className="max-w-xl mx-auto p-6 bg-white shadow-md rounded-lg space-y-6 text-gray-800 text-sm">
       <h2 className="text-xl font-bold border-b pb-2 text-gray-900">📦 Simplified Product Creator</h2>
 
-      {/* 🖼️ Image Upload Field & Progress Bar */}
+      {/* 🖼️ Image Upload Field */}
       <div className="space-y-2 border-2 border-dashed p-4 rounded-md bg-gray-50 text-center">
         <label className="block font-medium cursor-pointer text-blue-600 hover:underline">
           📷 Click to Upload Product Image
-          <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+          <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" disabled={isPublishing} />
         </label>
         
         {uploadProgress !== null && (
@@ -238,14 +236,13 @@ export default function AdminProductForm() {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block font-medium">Product Name</label>
-          <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
+          <input type="text" required disabled={isPublishing} value={name} onChange={e => setName(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
         </div>
         <div>
           <label className="block font-medium">Brand Name</label>
-          <input type="text" value={brand} onChange={e => setBrand(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
+          <input type="text" disabled={isPublishing} value={brand} onChange={e => setBrand(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
         </div>
         
-        {/* 🔄 Connected Dynamic Category Field */}
         <div>
           <label className="block font-medium">Category</label>
           {loadingCategories ? (
@@ -255,6 +252,7 @@ export default function AdminProductForm() {
           ) : (
             <select
               required
+              disabled={isPublishing}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="w-full p-2 border rounded mt-1 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -271,11 +269,11 @@ export default function AdminProductForm() {
 
         <div>
           <label className="block font-medium">Tags (separated by commas)</label>
-          <input type="text" placeholder="unisex, summer, vintage" value={tags} onChange={e => setTags(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
+          <input type="text" disabled={isPublishing} placeholder="unisex, summer, vintage" value={tags} onChange={e => setTags(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
         </div>
         <div className="col-span-2">
           <label className="block font-medium">Product Description</label>
-          <textarea required rows={3} value={description} onChange={e => setDescription(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" placeholder="Describe the product features, material, fit..." />
+          <textarea required disabled={isPublishing} rows={3} value={description} onChange={e => setDescription(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" placeholder="Describe the product features, material, fit..." />
         </div>
       </div>
 
@@ -283,12 +281,12 @@ export default function AdminProductForm() {
       <div className="grid grid-cols-2 gap-4 border-t pt-4">
         <div>
           <label className="block font-medium">Price ($)</label>
-          <input type="number" required value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
+          <input type="number" required disabled={isPublishing} value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
         </div>
         {isOnSale && (
           <div>
             <label className="block font-medium">Discount Percentage (%)</label>
-            <input type="number" value={salePercentage} onChange={e => setSalePercentage(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
+            <input type="number" disabled={isPublishing} value={salePercentage} onChange={e => setSalePercentage(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
           </div>
         )}
       </div>
@@ -296,26 +294,42 @@ export default function AdminProductForm() {
       {/* 🛡️ Status Badges */}
       <div className="flex gap-6 border-y py-3 bg-gray-50 px-4 rounded">
         <label className="flex items-center gap-2 font-medium cursor-pointer">
-          <input type="checkbox" checked={isNew} onChange={e => setIsNew(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
+          <input type="checkbox" disabled={isPublishing} checked={isNew} onChange={e => setIsNew(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
           🏷️ Mark as "New Arrival"
         </label>
         <label className="flex items-center gap-2 font-medium cursor-pointer">
-          <input type="checkbox" checked={isOnSale} onChange={e => setIsOnSale(e.target.checked)} className="rounded text-red-600 focus:ring-red-500" />
+          <input type="checkbox" disabled={isPublishing} checked={isOnSale} onChange={e => setIsOnSale(e.target.checked)} className="rounded text-red-600 focus:ring-red-500" />
           🔥 Mark as "On Sale"
         </label>
       </div>
 
+      {/* 📦 Base Stock Input */}
+      {variants.length === 0 && (
+        <div className="p-4 border rounded bg-slate-50 space-y-2">
+          <label className="block font-bold text-gray-900">Base Stock Quantity</label>
+          <p className="text-xs text-gray-500">Since no color/size groups are configured, enter the total available stock for this item.</p>
+          <input 
+            type="number" 
+            disabled={isPublishing}
+            placeholder="e.g. 50" 
+            value={baseStock} 
+            onChange={e => setBaseStock(e.target.value)} 
+            className="w-full p-2 border rounded text-gray-900 bg-white" 
+          />
+        </div>
+      )}
+
       {/* 🛠️ Simplified Variant Builder */}
       <div className="p-4 border rounded bg-slate-50 space-y-4">
         <h3 className="font-bold text-gray-900">🎨 Step 1: Define Color Group</h3>
-        <input type="text" placeholder="Color Name (e.g., Matte Black)" value={colorName} onChange={e => setColorName(e.target.value)} className="w-full p-2 border rounded text-gray-900 bg-white" />
+        <input type="text" disabled={isPublishing} placeholder="Color Name (e.g., Matte Black)" value={colorName} onChange={e => setColorName(e.target.value)} className="w-full p-2 border rounded text-gray-900 bg-white" />
 
         <div className="border-l-4 border-blue-500 pl-3 space-y-2 bg-white p-3 rounded-r shadow-sm">
           <span className="text-xs font-bold text-blue-700 block uppercase">Step 2: Add Sizes to {colorName || "this color"}</span>
           <div className="flex gap-2">
-            <input type="text" placeholder="Size (e.g., M or 10)" value={sizeName} onChange={e => setSizeName(e.target.value)} className="w-full p-2 border rounded text-gray-900" />
-            <input type="number" placeholder="Stock Qty" value={stockQty} onChange={e => setStockQty(e.target.value)} className="w-full p-2 border rounded text-gray-900" />
-            <button type="button" onClick={handleAddSize} className="bg-blue-600 text-white px-4 rounded font-bold hover:bg-blue-700">Add</button>
+            <input type="text" disabled={isPublishing} placeholder="Size (e.g., M or 10)" value={sizeName} onChange={e => setSizeName(e.target.value)} className="w-full p-2 border rounded text-gray-900" />
+            <input type="number" disabled={isPublishing} placeholder="Stock Qty" value={stockQty} onChange={e => setStockQty(e.target.value)} className="w-full p-2 border rounded text-gray-900" />
+            <button type="button" disabled={isPublishing} onClick={handleAddSize} className="bg-blue-600 text-white px-4 rounded font-bold hover:bg-blue-700">Add</button>
           </div>
           
           {tempSizes.length > 0 && (
@@ -329,7 +343,7 @@ export default function AdminProductForm() {
           )}
         </div>
 
-        <button type="button" onClick={handleSaveColorGroup} className="w-full bg-emerald-600 text-white py-2 rounded font-bold hover:bg-emerald-700">
+        <button type="button" disabled={isPublishing} onClick={handleSaveColorGroup} className="w-full bg-emerald-600 text-white py-2 rounded font-bold hover:bg-emerald-700">
           Save Color Group
         </button>
 
@@ -340,7 +354,7 @@ export default function AdminProductForm() {
             {variants.map((v, i) => (
               <div key={i} className="p-2 bg-white rounded border flex justify-between items-center text-xs shadow-sm">
                 <span><strong>{v.color}:</strong> {v.sizes.map(s => `${s.size} (${s.stock} pcs)`).join(", ")}</span>
-                <button type="button" onClick={() => setVariants(variants.filter((_, idx) => idx !== i))} className="text-red-500 hover:underline">Delete</button>
+                <button type="button" disabled={isPublishing} onClick={() => setVariants(variants.filter((_, idx) => idx !== i))} className="text-red-500 hover:underline">Delete</button>
               </div>
             ))}
           </div>
@@ -348,8 +362,14 @@ export default function AdminProductForm() {
       </div>
 
       {/* 🚀 Submit Button */}
-      <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-md font-bold hover:bg-gray-800 transition-colors shadow">
-        Publish Entire Product
+      <button 
+        type="submit" 
+        disabled={isPublishing}
+        className={`w-full bg-gray-900 text-white py-3 rounded-md font-bold transition-all shadow select-none ${
+          isPublishing ? "opacity-50 cursor-not-allowed bg-gray-600" : "hover:bg-gray-800 cursor-pointer"
+        }`}
+      >
+        {isPublishing ? "Publishing Product... ⏳" : "Publish Entire Product"}
       </button>
     </form>
   );

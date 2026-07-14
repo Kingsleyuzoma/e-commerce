@@ -22,7 +22,6 @@ export default function CategoryPage(props: PageProps) {
 
     const fetchCategoryProducts = async () => {
       try {
-        // 🔍 Queries directly using the category name from the URL
         const q = query(
           collection(db, "products"), 
           where("category", "==", categoryName.toLowerCase())
@@ -31,10 +30,26 @@ export default function CategoryPage(props: PageProps) {
         
         const loadedProducts = querySnapshot.docs.map(doc => {
           const data = doc.data() as any;
+          
+          const firestoreStock = 
+            data.availableStock !== undefined ? data.availableStock :
+            data.stock !== undefined ? data.stock :
+            data.quantity !== undefined ? data.quantity : 0;
+
           return {
             id: doc.id,
             slug: data.slug || doc.id, 
-            ...data
+            name: data.name || "",
+            brand: data.brand || "",
+            description: data.description || "",
+            price: Number(data.price) || 0,
+            salePercentage: Number(data.salePercentage) || 0,
+            category: data.category || "",
+            isNew: Boolean(data.isNew),
+            imageUrl: data.imageUrl || "",
+            variants: data.variants || [],
+            tags: data.tags || [],
+            availableStock: Number(firestoreStock)
           };
         });
 

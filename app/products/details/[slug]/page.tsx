@@ -97,7 +97,7 @@ export default function ProductDetailsPage(props: PageProps) {
           setProduct(loadedProduct);
 
           // Default first option
-          if (loadedProduct.variants.length > 0) {
+          if (loadedProduct.variants && loadedProduct.variants.length > 0) {
             const firstVariant = loadedProduct.variants[0];
             setSelectedColor(firstVariant.color);
 
@@ -148,28 +148,32 @@ export default function ProductDetailsPage(props: PageProps) {
     : product.price;
 
   // ================= SELECTED VARIANT =================
-  const activeColor = product.variants.find(
-    (variant) => variant.color === selectedColor
-  );
+  const hasVariants = product.variants && product.variants.length > 0;
 
-  const activeSize = activeColor?.sizes.find(
-    (item) => item.size === selectedSize
-  );
+  // Safe checks: Only look up color and size variables if variants exist
+  const activeColor = hasVariants
+    ? product.variants.find((variant) => variant.color === selectedColor)
+    : undefined;
 
-  const currentStock = activeSize?.stock || 0;
+  const activeSize = activeColor
+    ? activeColor.sizes.find((item) => item.size === selectedSize)
+    : undefined;
+
+  // If the product has variants, read the active size stock. Otherwise, read the base stock
+  const currentStock = hasVariants ? (activeSize?.stock || 0) : product.availableStock;
 
   // ================= CART =================
   const handleAddToCart = () => {
-    if (product.variants.length > 0 && (!selectedColor || !selectedSize)) {
+    if (hasVariants && (!selectedColor || !selectedSize)) {
       alert("Please select color and size");
       return;
     }
 
     addToCart({
-      id: `${product.id}-${selectedColor}-${selectedSize}`,
+      id: hasVariants ? `${product.id}-${selectedColor}-${selectedSize}` : `${product.id}-default`,
       quantity,
-      selectedColor,
-      selectedSize,
+      selectedColor: hasVariants ? selectedColor : "",
+      selectedSize: hasVariants ? selectedSize : "",
       product: {
         id: product.id,
         name: product.name,
@@ -242,55 +246,59 @@ export default function ProductDetailsPage(props: PageProps) {
           </div>
 
           {/* COLORS */}
-          <div className="mt-8">
-            <h3 className="font-bold mb-3">
-              Color:
-              <span className="text-pink-600 ml-2">{selectedColor}</span>
-            </h3>
+          {hasVariants && (
+            <div className="mt-8">
+              <h3 className="font-bold mb-3">
+                Color:
+                <span className="text-pink-600 ml-2">{selectedColor}</span>
+              </h3>
 
-            <div className="flex gap-3">
-              {product.variants.map((variant) => (
-                <button
-                  key={variant.color}
-                  onClick={() => {
-                    setSelectedColor(variant.color);
-                    setSelectedSize(variant.sizes[0]?.size);
-                  }}
-                  className={`px-4 py-2 rounded-lg border ${
-                    selectedColor === variant.color
-                      ? "border-pink-600 bg-pink-50"
-                      : "border-gray-300"
-                  }`}
-                >
-                  {variant.color}
-                </button>
-              ))}
+              <div className="flex gap-3">
+                {product.variants.map((variant) => (
+                  <button
+                    key={variant.color}
+                    onClick={() => {
+                      setSelectedColor(variant.color);
+                      setSelectedSize(variant.sizes[0]?.size);
+                    }}
+                    className={`px-4 py-2 rounded-lg border ${
+                      selectedColor === variant.color
+                        ? "border-pink-600 bg-pink-50"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    {variant.color}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* SIZE */}
-          <div className="mt-6">
-            <h3 className="font-bold mb-3">Size</h3>
-            <div className="flex gap-3 flex-wrap">
-              {activeColor?.sizes.map((size) => (
-                <button
-                  key={String(size.size)}
-                  disabled={size.stock === 0}
-                  onClick={() => {
-                    setSelectedSize(size.size);
-                    setQuantity(1);
-                  }}
-                  className={`px-4 py-2 rounded-lg border ${
-                    selectedSize === size.size
-                      ? "bg-pink-600 text-white"
-                      : "bg-white"
-                  } ${size.stock === 0 ? "opacity-40" : ""}`}
-                >
-                  {size.size} ({size.stock})
-                </button>
-              ))}
+          {/* SIZE (only show if variant exists) */}
+          {activeColor && activeColor.sizes.length > 0 && (
+            <div className="mt-6">
+              <h3 className="font-bold mb-3">Size</h3>
+              <div className="flex gap-3 flex-wrap">
+                {activeColor.sizes.map((size) => (
+                  <button
+                    key={String(size.size)}
+                    disabled={size.stock === 0}
+                    onClick={() => {
+                      setSelectedSize(size.size);
+                      setQuantity(1);
+                    }}
+                    className={`px-4 py-2 rounded-lg border ${
+                      selectedSize === size.size
+                        ? "bg-pink-600 text-white"
+                        : "bg-white"
+                    } ${size.stock === 0 ? "opacity-40" : ""}`}
+                  >
+                    {size.size} ({size.stock})
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* QUANTITY */}
           <div className="mt-8 flex items-center gap-5">

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useCart } from "@/Context/CartContext"; // ✅ Matches context capitalization path
+import { useCart } from "@/Context/CartContext"; 
 
 interface SizeVariant {
   size: string | number;
@@ -28,61 +28,70 @@ interface ProductCardProps {
     imageUrl: string;
     variants: ColorVariant[];
     tags: string[];
-    
+    availableStock: number; 
   };
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart(); 
 
-  // 🎨 Track variant details
+  const hasVariants = product.variants && product.variants.length > 0;
+
   const [selectedColor, setSelectedColor] = useState<string | null>(
-    product.variants.length > 0 ? product.variants[0].color : null
+    hasVariants ? product.variants[0].color : null
   );
   const [selectedSize, setSelectedSize] = useState<string | number | null>(null);
 
-  // 🧮 Calculate aggregate variant count to check if completely out of stock
-  const totalStock = product.variants.reduce((total, variant) => {
-    const variantStock = variant.sizes.reduce((sum, sizeItem) => sum + sizeItem.stock, 0);
-    return total + variantStock;
-  }, 0);
+  // 🧮 Evaluates variant stocks or global base storage numbers seamlessly
+  const totalStock = hasVariants
+    ? product.variants.reduce((total, variant) => {
+        const variantStock = variant.sizes.reduce((sum, sizeItem) => sum + sizeItem.stock, 0);
+        return total + variantStock;
+      }, 0)
+    : Number(product.availableStock) || 0;
 
   const hasSale = product.salePercentage > 0;
   const salePrice = hasSale ? product.price * (1 - product.salePercentage / 100) : product.price;
 
-  const activeVariant = product.variants.find((v) => v.color === selectedColor);
+  const activeVariant = hasVariants 
+    ? product.variants.find((v) => v.color === selectedColor)
+    : undefined;
 
   const handleColorChange = (color: string) => {
     setSelectedColor(color);
     setSelectedSize(null); 
   };
 
-  // 🛒 Formats the payload to satisfy CartContext constraints
   const handleAddToCart = () => {
-    if (!selectedColor) {
-      alert("Please choose a color before adding to the cart! 🎨");
-      return;
-    }
-    if (!selectedSize) {
-      alert("Please select a size before adding to the cart! 📐");
-      return;
+    if (hasVariants) {
+      if (!selectedColor) {
+        alert("Please choose a color before adding to the cart! 🎨");
+        return;
+      }
+      if (!selectedSize) {
+        alert("Please select a size before adding to the cart! 📐");
+        return;
+      }
+
+      const specificSizeObj = activeVariant?.sizes.find(s => s.size === selectedSize);
+      const availableStockForThisVariant = specificSizeObj ? specificSizeObj.stock : 0;
+
+      if (availableStockForThisVariant <= 0) {
+        alert("Sorry, this exact variant is out of stock! 📦");
+        return;
+      }
+    } else {
+      if (totalStock <= 0) {
+        alert("Sorry, this item is out of stock! 📦");
+        return;
+      }
     }
 
-    // Find the specific structural stock limit for this single selected item layout option
-    const specificSizeObj = activeVariant?.sizes.find(s => s.size === selectedSize);
-    const availableStockForThisVariant = specificSizeObj ? specificSizeObj.stock : 0;
-
-    if (availableStockForThisVariant <= 0) {
-      alert("Sorry, this exact variant is out of stock! 📦");
-      return;
-    }
-
-    // ✅ Reconfigured object structure to perfectly match your CartContext and [slug] schemas
     addToCart({
-      id: `${product.id}-${selectedColor}-${selectedSize}`,
+      id: hasVariants ? `${product.id}-${selectedColor}-${selectedSize}` : `${product.id}-default`,
       quantity: 1,
-      selectedColor,
-      selectedSize: String(selectedSize),
+      selectedColor: hasVariants ? (selectedColor || "") : "",
+      selectedSize: hasVariants ? String(selectedSize) : "",
       product: {
         id: product.id,
         name: product.name,
@@ -90,7 +99,6 @@ export default function ProductCard({ product }: ProductCardProps) {
         price: product.price,
         salePrice: hasSale ? salePrice : undefined,
         imageUrl: product.imageUrl || "/placeholder-image.jpg",
-        // Included required fields to satisfy CartContext's Product type
         description: product.description,
         category: product.category,
       }
@@ -102,7 +110,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   return (
     <div className="group relative border border-gray-200 rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-full text-sm text-gray-800">
       <div>
-        {/* Badges (New / Sale) */}
+        {/* Badges */}
         <div className="absolute top-6 left-6 z-10 flex flex-col gap-1">
           {product.isNew && (
             <span className="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
@@ -116,7 +124,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
-        {/* Clickable Product Image Canvas */}
+        {/* Product Image */}
         <Link href={`/products/details/${product.name}`} className="block aspect-square w-full bg-gray-100 rounded-lg overflow-hidden relative border border-gray-100 mb-4 cursor-pointer">
           <img
             src={product.imageUrl || "/placeholder-image.jpg"}
@@ -131,16 +139,16 @@ export default function ProductCard({ product }: ProductCardProps) {
           <span className="bg-gray-100 px-2 py-0.5 rounded text-[12px] font-medium tracking-normal normal-case">{product.category}</span>
         </div>
 
-        {/* Clickable Product Name & Static Description */}
-       <Link href={`/products/details/${product.name}`} className="block cursor-pointer">
-  <h3 className="font-semibold text-gray-800 text-base line-clamp-1 mb-1 hover:text-gray-600 transition-colors">
-    {product.name}
-  </h3>
-</Link>
+        {/* Product Name & Description */}
+        <Link href={`/products/details/${product.name}`} className="block cursor-pointer">
+          <h3 className="font-semibold text-gray-800 text-base line-clamp-1 mb-1 hover:text-gray-600 transition-colors">
+            {product.name}
+          </h3>
+        </Link>
         <p className="text-xs text-gray-500 line-clamp-2 mb-3 h-8">{product.description}</p>
 
-        {/* Colors Selection Buttons */}
-        {product.variants.length > 0 && (
+        {/* Colors Selection */}
+        {hasVariants && (
           <div className="flex flex-wrap gap-1 mb-3 items-center">
             <span className="text-[11px] text-gray-400 mr-1">Colors:</span>
             {product.variants.map((v, i) => (
@@ -160,7 +168,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         )}
 
-        {/* Sizes Display Buttons */}
+        {/* Sizes Display */}
         {activeVariant && activeVariant.sizes.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3 items-center">
             <span className="text-[11px] text-gray-400 mr-1">Sizes:</span>
@@ -201,7 +209,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </span>
         </div>
 
-        {/* Price Row & Action Trigger */}
+        {/* Price Row & Action Button */}
         <div className="flex items-center justify-between mt-2 pt-3 border-t border-gray-100">
           <div className="flex flex-col">
             {hasSale ? (
@@ -218,7 +226,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             type="button"
             disabled={totalStock === 0}
             onClick={handleAddToCart}
-            className="bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+            className="bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer"
           >
             Add to Cart
           </button>
