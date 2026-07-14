@@ -25,16 +25,23 @@ const Navbar = () => {
   const { user, isAdmin, logout } = useAuth();
   const { getCartCount, setIsCartOpen } = useCart();
 
-  // 📡 Real-time listener for the navbar categories dropdown
+  // 📡 Real-time listener pointing directly to the linked 'categories' collection
   useEffect(() => {
-    const q = query(collection(db, 'Product Categories'));
+    const q = query(collection(db, 'categories'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const dynamicCategories = snapshot.docs.map(doc => ({
-        name: doc.data().name,
-        href: `/products/${doc.data().slug}`
-      }));
+      const dynamicCategories = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          name: data.name,
+          // ✅ Updated: Explicitly routing dynamic categories to the dedicated category layout folder
+          href: `/products/category/${data.slug}`
+        };
+      });
       
-      // Merge 'All Products' with the database results
+      // Sort the database categories alphabetically before merging
+      dynamicCategories.sort((a, b) => a.name.localeCompare(b.name));
+
+      // Merge 'All Products' with the updated database results
       setCategories([
         { name: 'All Products', href: '/products' },
         ...dynamicCategories

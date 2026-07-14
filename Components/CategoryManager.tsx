@@ -1,107 +1,158 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { db } from '@/config/firebase'; 
-import { collection, addDoc, onSnapshot, query, doc, deleteDoc } from 'firebase/firestore';
+import { useState, useEffect } from "react";
+import { db } from "@/config/firebase";
+import { collection, getDocs, addDoc, deleteDoc, doc } from "firebase/firestore";
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 export default function CategoryManager() {
-  const [categoryName, setCategoryName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 📡 Listen to categories collection in real-time
-  useEffect(() => {
-    const q = query(collection(db, 'Product Categories'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const categoriesArray = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name,
-        slug: doc.data().slug
-      }));
-      setCategories(categoriesArray);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // 🚀 Save a new category to Firestore
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!categoryName.trim()) return;
-
-    setIsLoading(true);
+  // 📥 Fetch live categories from the database
+  const fetchCategories = async () => {
     try {
-      await addDoc(collection(db, 'Product Categories'), {
-        name: categoryName.trim(),
-        slug: categoryName.trim().toLowerCase().replace(/\s+/g, '-')
+      const querySnapshot = await getDocs(collection(db, "categories"));
+      const list: Category[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        list.push({
+          id: doc.id,
+          name: data.name || "",
+          slug: data.slug || "",
+        });
       });
-      setCategoryName(''); 
+      // Sort alphabetically for clean UI experience
+      setCategories(list.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (error) {
-      console.error("Error adding category: ", error);
+      console.error("Error fetching categories:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 🗑️ Delete a category from Firestore
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this category?")) return;
-    
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  // 🚀 Add Category handler
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+
+    // Generate a clean slug (e.g., "Men's Hoodies" -> "mens-hoodies")
+    const slug = newCategoryName
+      .trim()
+      .toLowerCase()
+      .replace(/['’]/g, "") // remove apostrophes
+      .replace(/[^a-z0-9]+/g, "-") // replace symbols/spaces with hyphens
+      .replace(/(^-|-$)/g, ""); // trim hyphens from ends
+
+    // Prevent duplicate local names or slugs
+    if (categories.some((c) => c.slug === slug || c.name.toLowerCase() === newCategoryName.trim().toLowerCase())) {
+      alert("This category already exists!");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      await deleteDoc(doc(db, 'Product Categories', id));
+      const docRef = await addDoc(collection(db, "categories"), {
+        name: newCategoryName.trim(),
+        slug: slug,
+        createdAt: new Date(),
+      });
+
+      // Instantly update local UI state
+      setCategories((prev) =>
+        [...prev, { id: docRef.id, name: newCategoryName.trim(), slug }].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
+      );
+      setNewCategoryName("");
+      alert("🎉 Category added successfully!");
     } catch (error) {
-      console.error("Error deleting category: ", error);
+      console.error("Error adding category:", error);
+      alert("Failed to add category.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 🗑️ Delete Category handler
+  const handleDeleteCategory = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete the category "${name}"?`)) return;
+
+    try {
+      await deleteDoc(doc(db, "categories", id));
+      setCategories((prev) => prev.filter((cat) => cat.id !== id));
+      alert("Category deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      alert("Failed to delete category.");
     }
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 space-y-6">
-      {/* Form Section */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Add New Category 🏷️</label>
-          <div className="mt-1 flex gap-2">
-            <input
-              type="text"
-              value={categoryName}
-              onChange={(e) => setCategoryName(e.target.value)}
-              placeholder="e.g., Skincare, New Arrivals"
-              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isLoading}
-            />
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:bg-blue-300 transition-colors"
-            >
-              {isLoading ? 'Saving...' : 'Add'}
-            </button>
-          </div>
+    <div className="max-w-md mx-auto p-6 bg-white shadow-md rounded-lg space-y-6 text-gray-800 text-sm">
+      <h2 className="text-xl font-bold border-b pb-2 text-gray-900">📁 Category Manager</h2>
+
+      {/* ➕ Add New Category Form */}
+      <form onSubmit={handleAddCategory} className="space-y-2">
+        <label className="block font-medium text-gray-700">New Category Name</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            required
+            placeholder="e.g., Running Shoes, Winter Hoodies"
+            className="w-full p-2 border rounded text-gray-900"
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            disabled={isSubmitting}
+          />
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {isSubmitting ? "Adding..." : "Add"}
+          </button>
         </div>
       </form>
 
-      {/* Categories Grid List */}
-      <div>
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Existing Categories 🗂️</h3>
-        {categories.length === 0 ? (
-          <p className="text-xs text-gray-400">No categories added yet.</p>
+      {/* 📋 List View of Created Categories */}
+      <div className="space-y-2">
+        <h3 className="font-semibold text-gray-900 border-t pt-4">Current Active Categories</h3>
+        
+        {isLoading ? (
+          <div className="text-xs text-gray-400 animate-pulse py-2">Loading catalog categories...</div>
+        ) : categories.length === 0 ? (
+          <div className="text-xs italic text-gray-400 bg-gray-50 p-4 text-center rounded border border-dashed">
+            No categories created yet. Add one above!
+          </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="border rounded divide-y max-h-60 overflow-y-auto bg-gray-50/50">
             {categories.map((cat) => (
-              <span 
-                key={cat.id} 
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200"
-              >
-                {cat.name}
+              <div key={cat.id} className="flex justify-between items-center p-2.5 bg-white shadow-sm hover:bg-gray-50 text-xs">
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-800">{cat.name}</span>
+                  <span className="text-[10px] text-gray-400">Slug: {cat.slug}</span>
+                </div>
                 <button
-                  onClick={() => handleDelete(cat.id)}
-                  className="text-gray-400 hover:text-red-600 transition-colors focus:outline-none"
-                  title="Delete Category"
+                  type="button"
+                  onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                  className="text-red-500 hover:text-red-700 font-semibold hover:underline"
                 >
-                  ✕
+                  Delete
                 </button>
-              </span>
+              </div>
             ))}
           </div>
         )}

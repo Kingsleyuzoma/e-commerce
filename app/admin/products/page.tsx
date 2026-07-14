@@ -1,27 +1,46 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { db } from "@/config/firebase"; 
 import { collection, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
 
+// 📐 Define variant interfaces to match the ProductCard structure
+interface SizeVariant {
+  size: string | number;
+  stock: number;
+}
+
+interface ColorVariant {
+  color: string;
+  sizes: SizeVariant[];
+}
+
+// 🗂️ Updated Product type definition with all payload fields
 type Product = {
   id: string;
   name: string;
   category: string;
   brand: string;
+  description: string;
   price: number;
-  availableStock: number; 
+  salePercentage: number;
+  tags: string[];
+  isNew: boolean;
+  isOnSale: boolean;
   imageUrl?: string;
+  variants: ColorVariant[];
+  availableStock: number; 
 };
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]); 
   const [isLoading, setIsLoading] = useState(true); 
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null); // ✍️ Tracks product being edited
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null); 
   const productsPerPage = 10;
 
-  // 📥 Fetch live products from Firestore
+  // 📥 Fetch live products from Firestore with all fields mapped
   const fetchProducts = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "products"));
@@ -34,9 +53,15 @@ export default function ProductsPage() {
           name: data.name || "",
           category: data.category || "",
           brand: data.brand || "",
+          description: data.description || "",
           price: Number(data.price) || 0,
-          availableStock: Number(data.availableStock) || 0, 
+          salePercentage: Number(data.salePercentage) || 0,
+          tags: Array.isArray(data.tags) ? data.tags : [],
+          isNew: Boolean(data.isNew),
+          isOnSale: Boolean(data.isOnSale),
           imageUrl: data.imageUrl || "",
+          variants: Array.isArray(data.variants) ? data.variants : [],
+          availableStock: Number(data.availableStock) || 0, 
         });
       });
 
@@ -66,7 +91,7 @@ export default function ProductsPage() {
     }
   };
 
-  // 💾 Handle Update/Edit Save
+  // 💾 Handle Update/Edit Save (Preserves all fields)
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -77,21 +102,45 @@ export default function ProductsPage() {
         name: editingProduct.name,
         category: editingProduct.category,
         brand: editingProduct.brand,
+        description: editingProduct.description,
         price: Number(editingProduct.price),
+        salePercentage: Number(editingProduct.salePercentage) || 0,
+        tags: editingProduct.tags || [],
+        isNew: Boolean(editingProduct.isNew),
+        isOnSale: Boolean(editingProduct.isOnSale),
+        variants: editingProduct.variants || [],
         availableStock: Number(editingProduct.availableStock),
       });
 
-      // Update local state state matrix
       setProducts((prev) =>
         prev.map((p) => (p.id === editingProduct.id ? editingProduct : p))
       );
       
       alert("Product updated successfully!");
-      setEditingProduct(null); // Close the edit window
+      setEditingProduct(null); 
     } catch (error) {
       console.error("Error updating product: ", error);
       alert("Failed to update product.");
     }
+  };
+
+  // 🔄 Helper function to update stock for a specific color and size variant inside the state handler
+  const handleVariantStockChange = (colorIdx: number, sizeIdx: number, newStock: number) => {
+    if (!editingProduct) return;
+
+    const updatedVariants = [...editingProduct.variants];
+    updatedVariants[colorIdx].sizes[sizeIdx].stock = newStock;
+
+    // Recalculate total available stock automatically based on the sum of variants
+    const totalStock = updatedVariants.reduce((total, v) => {
+      return total + v.sizes.reduce((sSum, s) => sSum + s.stock, 0);
+    }, 0);
+
+    setEditingProduct({
+      ...editingProduct,
+      variants: updatedVariants,
+      availableStock: totalStock // Kept synchronized!
+    });
   };
 
   const startIndex = (currentPage - 1) * productsPerPage;
@@ -114,23 +163,26 @@ export default function ProductsPage() {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">📊 All Products ({products.length})</h1>
       
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse min-w-[1200px]">
           <thead>
             <tr className="border-b-2 border-gray-200 bg-gray-50 text-gray-700 font-semibold">
               <th className="p-3">#</th>
               <th className="p-3">Image</th>
               <th className="p-3">Name</th>
-              <th className="p-3">Category</th>
-              <th className="p-3">Brand</th>
+              <th className="p-3">Description</th>
+              <th className="p-3">Category / Brand</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th> 
+              <th className="p-3">Variants</th>
+              <th className="p-3">Badges</th>
+              <th className="p-3">Tags</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {displayedProducts.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-gray-400">
+                <td colSpan={11} className="p-8 text-center text-gray-400">
                   No products found.
                 </td>
               </tr>
@@ -138,8 +190,8 @@ export default function ProductsPage() {
               displayedProducts.map((product, index) => {
                 const rowNumber = startIndex + index + 1;
                 return (
-                  <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50 text-gray-600 items-center">
-                    <td className="p-3 font-medium">{rowNumber}</td>
+                  <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50 text-gray-600 text-sm">
+                    <td className="p-3 font-medium text-gray-900">{rowNumber}</td>
                     <td className="p-3">
                       <div className="w-12 h-12 relative bg-gray-100 rounded overflow-hidden border border-gray-200">
                         <img 
@@ -149,11 +201,74 @@ export default function ProductsPage() {
                         />
                       </div>
                     </td>
-                    <td className="p-3">{product.name}</td>
-                    <td className="p-3">{product.category}</td>
-                    <td className="p-3">{product.brand}</td>
-                    <td className="p-3">${product.price.toFixed(2)}</td>
+                    <td className="p-3 font-semibold text-gray-800">{product.name}</td>
+                    <td className="p-3 max-w-xs truncate" title={product.description}>
+                      {product.description || <span className="text-gray-300 italic">No description</span>}
+                    </td>
+                    <td className="p-3">
+                      <div className="text-gray-900 font-medium">{product.category}</div>
+                      <div className="text-xs text-gray-400">{product.brand}</div>
+                    </td>
+                    <td className="p-3">
+                      <div className="font-semibold text-gray-900">${product.price.toFixed(2)}</div>
+                      {product.isOnSale && product.salePercentage > 0 && (
+                        <div className="text-xs text-green-600">-{product.salePercentage}% Off</div>
+                      )}
+                    </td>
                     <td className="p-3 font-semibold">{product.availableStock}</td> 
+                    
+                    {/* 🎨 Variants Column */}
+                    <td className="p-3">
+                      {product.variants && product.variants.length > 0 ? (
+                        <div className="flex flex-col gap-1 max-h-20 overflow-y-auto pr-1">
+                          {product.variants.map((v, vIdx) => (
+                            <div key={vIdx} className="text-xs">
+                              <span className="font-medium text-gray-800">{v.color}: </span>
+                              <span className="text-gray-500">
+                                {v.sizes?.map((s) => `${s.size}(${s.stock})`).join(", ")}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">None</span>
+                      )}
+                    </td>
+
+                    {/* 🏷️ Status Badges Column */}
+                    <td className="p-3">
+                      <div className="flex flex-col gap-1 items-start">
+                        {product.isNew && (
+                          <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-blue-100 text-blue-700">
+                            New Arrival
+                          </span>
+                        )}
+                        {product.isOnSale && (
+                          <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-green-100 text-green-700">
+                            On Sale
+                          </span>
+                        )}
+                        {!product.isNew && !product.isOnSale && (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* 🏷️ Tags Column */}
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1 max-w-[150px]">
+                        {product.tags && product.tags.length > 0 ? (
+                          product.tags.map((tag, tagIdx) => (
+                            <span key={tagIdx} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[11px]">
+                              #{tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">None</span>
+                        )}
+                      </div>
+                    </td>
+
                     <td className="p-3">
                       <div className="flex gap-2">
                         <button 
@@ -212,10 +327,10 @@ export default function ProductsPage() {
       {/* ✍️ Quick Edit Modal/Form Pop-up */}
       {editingProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center p-4 z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full shadow-xl relative space-y-4">
+          <div className="bg-white p-6 rounded-lg max-w-lg w-full shadow-xl relative space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-800">✏️ Edit Product</h2>
             
-            <form onSubmit={handleUpdate} className="space-y-3">
+            <form onSubmit={handleUpdate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
                 <input
@@ -224,6 +339,17 @@ export default function ProductsPage() {
                   className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={editingProduct.name}
                   onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  required
+                  rows={2}
+                  className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  value={editingProduct.description}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
                 />
               </div>
 
@@ -263,18 +389,85 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Quantity</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Stock (Calculated)</label>
                   <input
                     type="number"
-                    required
-                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled
+                    className="w-full p-2 border border-gray-300 rounded bg-gray-100 font-semibold text-gray-600 cursor-not-allowed"
                     value={editingProduct.availableStock}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, availableStock: Number(e.target.value) })}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
+              {/* 🎨 Dynamic Variants Editor Section */}
+              <div className="border border-gray-200 rounded p-3 bg-gray-50/50 space-y-2">
+                <label className="block text-sm font-semibold text-gray-800">🎨 Manage Color & Size Stocks</label>
+                {editingProduct.variants && editingProduct.variants.length > 0 ? (
+                  <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                    {editingProduct.variants.map((v, colorIdx) => (
+                      <div key={colorIdx} className="bg-white p-2 rounded border border-gray-200 space-y-1.5 shadow-sm">
+                        <div className="text-xs font-bold text-gray-700 uppercase">Color: {v.color}</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {v.sizes?.map((s, sizeIdx) => (
+                            <div key={sizeIdx} className="flex items-center gap-2 justify-between bg-gray-50 p-1.5 rounded text-xs">
+                              <span className="font-medium text-gray-600">Size {s.size}:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-16 p-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900"
+                                value={s.stock}
+                                onChange={(e) => handleVariantStockChange(colorIdx, sizeIdx, Number(e.target.value))}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs italic text-gray-400 bg-white p-2 text-center rounded border border-dashed">
+                    No active variants attached to this item.
+                  </div>
+                )}
+              </div>
+
+              {/* 🔄 Interactive Badges Fields */}
+              <div className="flex gap-4 p-2 bg-gray-50 rounded border border-gray-200">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                    checked={editingProduct.isNew}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, isNew: e.target.checked })}
+                  />
+                  New Arrival
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                    checked={editingProduct.isOnSale}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, isOnSale: e.target.checked })}
+                  />
+                  On Sale
+                </label>
+              </div>
+
+              {editingProduct.isOnSale && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sale Percentage (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={editingProduct.salePercentage || ""}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, salePercentage: Number(e.target.value) })}
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setEditingProduct(null)}

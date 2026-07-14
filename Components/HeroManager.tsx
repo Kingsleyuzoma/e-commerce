@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, storage } from '@/config/firebase';
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface Slide {
@@ -29,7 +29,7 @@ export default function HeroManager() {
   // 📑 Tab State (Defaults to Layout Cards)
   const [activeTab, setActiveTab] = useState<'cards' | 'carousel'>('cards');
 
-  // 🎬 Carousel Form & Data State
+  // 🎬 Carousel State
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
@@ -37,8 +37,9 @@ export default function HeroManager() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [slides, setSlides] = useState<Slide[]>([]);
+  const [editingSlideId, setEditingSlideId] = useState<string | null>(null); // ✏️ Track slider editing
 
-  // 💎 Layout Cards Form & Data State
+  // 💎 Layout Cards State
   const [cardForm, setCardForm] = useState({
     title: '',
     description: '',
@@ -49,6 +50,7 @@ export default function HeroManager() {
   const [cardImageFile, setCardImageFile] = useState<File | null>(null);
   const [cardUploading, setCardUploading] = useState(false);
   const [cards, setCards] = useState<HomepageCard[]>([]);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null); // ✏️ Track card editing
 
   // 📥 Fetch Carousel Slides
   const fetchSlides = async () => {
@@ -85,39 +87,80 @@ export default function HeroManager() {
     fetchCards();
   }, []);
 
-  // 🚀 Handle Carousel Slide Submit
+  // ✏️ Setup Carousel Slide for Editing
+  const startEditSlide = (slide: Slide) => {
+    setEditingSlideId(slide.id);
+    setTitle(slide.title);
+    setSubtitle(slide.subtitle);
+    setLinkUrl(slide.linkUrl);
+    setDisplayOrder(String(slide.displayOrder));
+    setImageFile(null); // Keep original image unless new file is uploaded
+    setActiveTab('carousel');
+  };
+
+  const cancelSlideEdit = () => {
+    setEditingSlideId(null);
+    setTitle('');
+    setSubtitle('');
+    setLinkUrl('');
+    setDisplayOrder('0');
+    setImageFile(null);
+  };
+
+  // 🚀 Handle Carousel Slide Submit (Create or Update)
   const handleCarouselSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!imageFile) {
-      alert("Please select an image file first! 🖼️");
-      return;
-    }
     setUploading(true);
     try {
-      const storageRef = ref(storage, `hero_slides/${Date.now()}_${imageFile.name}`);
-      const snapshot = await uploadBytes(storageRef, imageFile);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
+      let downloadUrl = "";
+      
+      if (imageFile) {
+        const storageRef = ref(storage, `hero_slides/${Date.now()}_${imageFile.name}`);
+        const snapshot = await uploadBytes(storageRef, imageFile);
+        downloadUrl = await getDownloadURL(snapshot.ref);
+      }
 
-      await addDoc(collection(db, "heroSlides"), {
-        title,
-        subtitle,
-        linkUrl: linkUrl || "/",
-        imageUrl: downloadUrl,
-        displayOrder: parseInt(displayOrder) || 0,
-        createdAt: new Date()
-      });
+      if (editingSlideId) {
+        // Update document workflow
+        const docRef = doc(db, "heroSlides", editingSlideId);
+        const updatePayload: any = {
+          title,
+          subtitle,
+          linkUrl: linkUrl || "/",
+          displayOrder: parseInt(displayOrder) || 0,
+        };
+        if (downloadUrl) updatePayload.imageUrl = downloadUrl;
+
+        await updateDoc(docRef, updatePayload);
+        setEditingSlideId(null);
+        alert("Slide updated successfully! 🎉");
+      } else {
+        // Create workflow
+        if (!imageFile) {
+          alert("Please select an image file first! 🖼️");
+          setUploading(false);
+          return;
+        }
+        await addDoc(collection(db, "heroSlides"), {
+          title,
+          subtitle,
+          linkUrl: linkUrl || "/",
+          imageUrl: downloadUrl,
+          displayOrder: parseInt(displayOrder) || 0,
+          createdAt: new Date()
+        });
+        alert("Slide created successfully! 🎉");
+      }
 
       setTitle('');
       setSubtitle('');
       setLinkUrl('');
       setDisplayOrder('0');
       setImageFile(null);
-      
       fetchSlides();
-      alert("Slide created successfully! 🎉");
     } catch (error) {
-      console.error("Error creating slide:", error);
-      alert("Failed to upload slide.");
+      console.error("Error saving slide:", error);
+      alert("Failed to save slide asset operations.");
     } finally {
       setUploading(false);
     }
@@ -127,32 +170,83 @@ export default function HeroManager() {
   const handleCarouselDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this slide?")) {
       await deleteDoc(doc(db, "heroSlides", id));
+      if (editingSlideId === id) cancelSlideEdit();
       fetchSlides();
     }
   };
 
-  // 🚀 Handle Layout Card Submit
+  // ✏️ Setup Layout Card for Editing
+  const startEditCard = (card: HomepageCard) => {
+    setEditingCardId(card.id);
+    setCardForm({
+      title: card.title,
+      description: card.description,
+      buttonText: card.buttonText,
+      linkUrl: card.linkUrl,
+      position: card.position
+    });
+    setCardImageFile(null); // Keep current image asset unless modified
+    setActiveTab('cards');
+  };
+
+  const cancelCardEdit = () => {
+    setEditingCardId(null);
+    setCardForm({
+      title: '',
+      description: '',
+      buttonText: '',
+      linkUrl: '',
+      position: 'left'
+    });
+    setCardImageFile(null);
+  };
+
+  // 🚀 Handle Layout Card Submit (Create or Update)
   const handleCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cardImageFile) {
-      alert("Please select an image for the card! 🖼️");
-      return;
-    }
     setCardUploading(true);
     try {
-      const storageRef = ref(storage, `homepage_cards/${Date.now()}_${cardImageFile.name}`);
-      const snapshot = await uploadBytes(storageRef, cardImageFile);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
+      let downloadUrl = "";
 
-      await addDoc(collection(db, "homepageCards"), {
-        title: cardForm.title,
-        description: cardForm.description,
-        buttonText: cardForm.buttonText || "View Details",
-        linkUrl: cardForm.linkUrl || "/",
-        position: cardForm.position,
-        imageUrl: downloadUrl,
-        createdAt: new Date()
-      });
+      if (cardImageFile) {
+        const storageRef = ref(storage, `homepage_cards/${Date.now()}_${cardImageFile.name}`);
+        const snapshot = await uploadBytes(storageRef, cardImageFile);
+        downloadUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      if (editingCardId) {
+        // Update legacy card entry configurations
+        const docRef = doc(db, "homepageCards", editingCardId);
+        const updatePayload: any = {
+          title: cardForm.title,
+          description: cardForm.description,
+          buttonText: cardForm.buttonText || "View Details",
+          linkUrl: cardForm.linkUrl || "/",
+          position: cardForm.position
+        };
+        if (downloadUrl) updatePayload.imageUrl = downloadUrl;
+
+        await updateDoc(docRef, updatePayload);
+        setEditingCardId(null);
+        alert("Layout card metadata saved! 🎉");
+      } else {
+        // Create normal asset workflow mapping bounds
+        if (!cardImageFile) {
+          alert("Please select an image for the card! 🖼️");
+          setCardUploading(false);
+          return;
+        }
+        await addDoc(collection(db, "homepageCards"), {
+          title: cardForm.title,
+          description: cardForm.description,
+          buttonText: cardForm.buttonText || "View Details",
+          linkUrl: cardForm.linkUrl || "/",
+          position: cardForm.position,
+          imageUrl: downloadUrl,
+          createdAt: new Date()
+        });
+        alert("Layout card published successfully! 🎉");
+      }
 
       setCardForm({
         title: '',
@@ -162,12 +256,10 @@ export default function HeroManager() {
         position: 'left'
       });
       setCardImageFile(null);
-      
       fetchCards();
-      alert("Layout card published successfully! 🎉");
     } catch (error) {
-      console.error("Error creating card:", error);
-      alert("Failed to upload card.");
+      console.error("Error storing card assets:", error);
+      alert("Failed to push layout payload configurations.");
     } finally {
       setCardUploading(false);
     }
@@ -177,12 +269,13 @@ export default function HeroManager() {
   const handleCardDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this layout card?")) {
       await deleteDoc(doc(db, "homepageCards", id));
+      if (editingCardId === id) cancelCardEdit();
       fetchCards();
     }
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-gray-50 rounded-2xl shadow-sm space-y-6">
+    <div className="p-6 max-w-4xl mx-auto bg-gray-50 rounded-2xl shadow-sm space-y-6 text-sm text-gray-800">
       <div>
         <h2 className="text-2xl font-extrabold text-gray-900">Homepage Asset Manager 🛠️</h2>
         <p className="text-gray-500 text-sm">Configure your hero banners and surrounding grid content.</p>
@@ -215,11 +308,12 @@ export default function HeroManager() {
       {/* 🔄 Tab Content Views */}
       {activeTab === 'cards' ? (
         <div className="space-y-8">
-          {/* Create Layout Card Form */}
+          {/* Create/Edit Layout Card Form */}
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Create New Home page Card</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">
+              {editingCardId ? "✏️ Edit Layout Card" : "Create New Home page Card"}
+            </h3>
             <form onSubmit={handleCardSubmit} className="space-y-4 max-w-xl">
-              {/* Position Radio Selector */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Card Position</label>
                 <div className="flex space-x-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
@@ -293,23 +387,36 @@ export default function HeroManager() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Card Display Image</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Card Display Image {editingCardId && <span className="text-xs text-gray-400 font-normal">(Leave blank to keep existing)</span>}
+                </label>
                 <input 
                   type="file" 
                   accept="image/*"
                   onChange={(e) => setCardImageFile(e.target.files ? e.target.files[0] : null)}
                   className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100" 
-                  required
+                  required={!editingCardId}
                 />
               </div>
 
-              <button 
-                type="submit" 
-                disabled={cardUploading}
-                className="w-full bg-pink-600 text-white font-bold p-3 rounded-md disabled:bg-gray-400 hover:bg-pink-700 transition text-sm"
-              >
-                {cardUploading ? "Uploading Assets... ⏳" : "Publish Layout Card 🚀"}
-              </button>
+              <div className="flex gap-3">
+                {editingCardId && (
+                  <button 
+                    type="button"
+                    onClick={cancelCardEdit}
+                    className="flex-1 bg-gray-200 text-gray-700 font-bold p-3 rounded-md hover:bg-gray-300 transition text-sm"
+                  >
+                    Cancel Action
+                  </button>
+                )}
+                <button 
+                  type="submit" 
+                  disabled={cardUploading}
+                  className={`font-bold p-3 rounded-md disabled:bg-gray-400 transition text-sm ${editingCardId ? 'flex-1 bg-amber-500 text-white hover:bg-amber-600' : 'w-full bg-pink-600 text-white hover:bg-pink-700'}`}
+                >
+                  {cardUploading ? "Saving updates... ⏳" : editingCardId ? "Save Card Updates 💾" : "Publish Layout Card 🚀"}
+                </button>
+              </div>
             </form>
           </div>
 
@@ -321,7 +428,7 @@ export default function HeroManager() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {cards.map((card) => (
-                  <div key={card.id} className="border border-gray-200 rounded-lg p-4 flex gap-4 items-center bg-gray-50">
+                  <div key={card.id} className={`border rounded-lg p-4 flex gap-4 items-center bg-gray-50 transition-all ${editingCardId === card.id ? 'ring-2 ring-amber-500 border-transparent bg-amber-50/20' : 'border-gray-200'}`}>
                     <img src={card.imageUrl} alt={card.title} className="w-20 h-20 object-cover rounded-md bg-gray-100" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
@@ -334,7 +441,24 @@ export default function HeroManager() {
                       </div>
                       <p className="text-xs text-gray-500 truncate">{card.description}</p>
                     </div>
-                    <button onClick={() => handleCardDelete(card.id)} className="text-red-500 hover:text-red-700 font-bold text-sm px-2">🗑️</button>
+                    <div className="flex items-center space-x-1">
+                      <button 
+                        type="button"
+                        onClick={() => startEditCard(card)} 
+                        className="text-gray-500 hover:text-amber-600 font-bold text-sm p-2 hover:bg-amber-50 rounded"
+                        title="Edit Card"
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleCardDelete(card.id)} 
+                        className="text-red-500 hover:text-red-700 font-bold text-sm p-2 hover:bg-rose-50 rounded"
+                        title="Delete Card"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -343,9 +467,11 @@ export default function HeroManager() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Create Slide Form */}
+          {/* Create/Edit Slide Form */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Create New Hero Slide</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">
+              {editingSlideId ? "✏️ Edit Hero Slide" : "Create New Hero Slide"}
+            </h3>
             <form onSubmit={handleCarouselSubmit} className="space-y-4 max-w-xl">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Main Title</label>
@@ -392,23 +518,36 @@ export default function HeroManager() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Banner Image File</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Banner Image File {editingSlideId && <span className="text-xs text-gray-400 font-normal">(Leave blank to keep existing)</span>}
+                </label>
                 <input 
                   type="file" 
                   accept="image/*"
                   onChange={(e) => setImageFile(e.target.files ? e.target.files[0] : null)}
                   className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100" 
-                  required
+                  required={!editingSlideId}
                 />
               </div>
 
-              <button 
-                type="submit" 
-                disabled={uploading}
-                className="w-full bg-slate-700 text-white font-bold p-3 rounded-md disabled:bg-gray-400 hover:bg-slate-800 transition text-sm"
-              >
-                {uploading ? "Uploading Assets... ⏳" : "Publish Slide 🚀"}
-              </button>
+              <div className="flex gap-3">
+                {editingSlideId && (
+                  <button 
+                    type="button"
+                    onClick={cancelSlideEdit}
+                    className="flex-1 bg-gray-200 text-gray-700 font-bold p-3 rounded-md hover:bg-gray-300 transition text-sm"
+                  >
+                    Cancel Action
+                  </button>
+                )}
+                <button 
+                  type="submit" 
+                  disabled={uploading}
+                  className={`font-bold p-3 rounded-md disabled:bg-gray-400 transition text-sm ${editingSlideId ? 'flex-1 bg-amber-500 text-white hover:bg-amber-600' : 'w-full bg-slate-700 text-white hover:bg-slate-800'}`}
+                >
+                  {uploading ? "Saving updates... ⏳" : editingSlideId ? "Save Slide Updates 💾" : "Publish Slide 🚀"}
+                </button>
+              </div>
             </form>
           </div>
 
@@ -420,7 +559,7 @@ export default function HeroManager() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {slides.map((slide) => (
-                  <div key={slide.id} className="border border-gray-200 rounded-lg p-4 flex gap-4 items-center bg-gray-50">
+                  <div key={slide.id} className={`border rounded-lg p-4 flex gap-4 items-center bg-gray-50 transition-all ${editingSlideId === slide.id ? 'ring-2 ring-amber-500 border-transparent bg-amber-50/20' : 'border-gray-200'}`}>
                     <img src={slide.imageUrl} alt={slide.title} className="w-20 h-20 object-cover rounded-md bg-gray-100" />
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm truncate text-gray-800">{slide.title}</p>
@@ -429,7 +568,24 @@ export default function HeroManager() {
                         Order: {slide.displayOrder}
                       </span>
                     </div>
-                    <button onClick={() => handleCarouselDelete(slide.id)} className="text-red-500 hover:text-red-700 font-bold text-sm px-2">🗑️</button>
+                    <div className="flex items-center space-x-1">
+                      <button 
+                        type="button"
+                        onClick={() => startEditSlide(slide)} 
+                        className="text-gray-500 hover:text-amber-600 font-bold text-sm p-2 hover:bg-amber-50 rounded"
+                        title="Edit Slide"
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleCarouselDelete(slide.id)} 
+                        className="text-red-500 hover:text-red-700 font-bold text-sm p-2 hover:bg-rose-50 rounded"
+                        title="Delete Slide"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

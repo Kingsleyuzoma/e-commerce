@@ -12,9 +12,9 @@ export default function CheckoutPage() {
   const { user, login } = useAuth();
   const router = useRouter();
 
-  // 📝 Form States
+  // 📝 Form States (Added state here)
   const [shippingData, setShippingData] = useState({
-    fullName: '', email: '', phone: '', address: '', city: '', postalCode: ''
+    fullName: '', email: '', phone: '', address: '', city: '', state: '', postalCode: ''
   });
   const [paymentData, setPaymentData] = useState({
     cardName: '', cardNumber: '', expiry: '', cvv: ''
@@ -40,9 +40,9 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 🔒 1. Check Shipping
-    if (!shippingData.fullName || !shippingData.email || !shippingData.phone || !shippingData.address || !shippingData.city || !shippingData.postalCode) {
-      setError('Please fill in all delivery details before submitting.');
+    // 🔒 1. Check Shipping (Added state requirement check here)
+    if (!shippingData.fullName || !shippingData.email || !shippingData.phone || !shippingData.address || !shippingData.city || !shippingData.state || !shippingData.postalCode) {
+      setError('Please fill in all delivery details (including your State) before submitting.');
       return;
     }
 
@@ -156,10 +156,16 @@ export default function CheckoutPage() {
                   <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Street Address</label>
                   <input type="text" name="address" value={shippingData.address} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="123 Luxury Lane" />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                {/* 🗺️ City, State, and Postal Code Grid Breakdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">City</label>
                     <input type="text" name="city" value={shippingData.city} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="Port Harcourt" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">State / Region</label>
+                    <input type="text" name="state" value={shippingData.state} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="Rivers State" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Postal Code</label>
@@ -205,12 +211,21 @@ export default function CheckoutPage() {
               <h2 className="text-md font-bold text-gray-900 tracking-wide">Review Cart Items</h2>
               {cart.map((item) => {
                 const currentPrice = item.product.salePrice ?? item.product.price;
+                const cartItemId = `${item.product.id}-${item.selectedColor || ''}-${item.selectedSize || ''}`;
+                
                 return (
-                  <div key={item.product.id} className="flex items-center justify-between border-b border-gray-50 pb-3 last:border-0 last:pb-0">
+                  <div key={cartItemId} className="flex items-center justify-between border-b border-gray-50 pb-3 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3">
                       <img src={item.product.imageUrl || "/placeholder.jpg"} alt={item.product.name} className="w-12 h-12 object-cover rounded-xl bg-gray-50 border" />
                       <div>
                         <h3 className="font-semibold text-gray-800 text-xs line-clamp-1">{item.product.name}</h3>
+                        {(item.selectedColor || item.selectedSize) && (
+                          <div className="flex gap-1 text-[10px] text-gray-500 my-0.5 font-medium">
+                            {item.selectedColor && <span>{item.selectedColor}</span>}
+                            {item.selectedColor && item.selectedSize && <span>•</span>}
+                            {item.selectedSize && <span>Size: {item.selectedSize}</span>}
+                          </div>
+                        )}
                         <p className="text-xs text-gray-400">${currentPrice.toFixed(2)} each</p>
                       </div>
                     </div>

@@ -40,7 +40,7 @@ const CartDrawer: React.FC = () => {
             <h2 className='text-lg font-bold text-gray-900 flex items-center gap-2'>
               <span>Your Cart</span>
               <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full">
-                {cart.length}
+                {cart.reduce((total, item) => total + item.quantity, 0)}
               </span>
             </h2>
             <button
@@ -62,8 +62,11 @@ const CartDrawer: React.FC = () => {
               cart.map((item) => {
                 const displayPrice = item.product.salePrice ?? item.product.price;
                 
+                // 🔑 Generate the exact compound key the Context requires to target specific variants
+                const cartItemId = `${item.product.id}-${item.selectedColor || ''}-${item.selectedSize || ''}`;
+                
                 return (
-                  <div key={item.product.id} className='flex items-start gap-4 py-4 border-b border-gray-100 relative group'>
+                  <div key={cartItemId} className='flex items-start gap-4 py-4 border-b border-gray-100 relative group'>
                     <img 
                       src={item.product.imageUrl || "/placeholder.jpg"} 
                       alt={item.product.name} 
@@ -74,26 +77,44 @@ const CartDrawer: React.FC = () => {
                     <div className='flex-1 min-w-0'>
                       <div className="flex justify-between items-start gap-2">
                         <h4 className='font-medium text-gray-950 truncate pr-4'>{item.product.name}</h4>
-                        {/* 🗑️ Remove Item Button */}
+                        {/* 🗑️ Remove Item Button using compound identifier */}
                         <button 
-                          onClick={() => removeFromCart(item.product.id)}
+                          onClick={() => removeFromCart(cartItemId)}
                           className="text-gray-400 hover:text-rose-600 transition-colors p-1"
                           title="Remove item"
                         >
                           ✕
                         </button>
                       </div>
-                      <p className='text-xs text-gray-500 uppercase tracking-wider'>{item.product.brand}</p>
+                      
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className='text-xs text-gray-500 uppercase tracking-wider'>{item.product.brand}</p>
+                        {/* 🎨 Selected Variant Badges */}
+                        {(item.selectedColor || item.selectedSize) && (
+                          <div className="flex gap-1 text-[10px] font-medium">
+                            {item.selectedColor && (
+                              <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded">
+                                {item.selectedColor}
+                              </span>
+                            )}
+                            {item.selectedSize && (
+                              <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded">
+                                Size: {item.selectedSize}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       
                       <div className='flex items-center justify-between mt-3'>
                         <p className='text-sm text-gray-900 font-semibold'>
                           ${(displayPrice * item.quantity).toFixed(2)}
                         </p>
                         
-                        {/* 🔢 Quantity Selector Controls */}
+                        {/* 🔢 Quantity Selector Controls using compound identifier */}
                         <div className='flex items-center border border-gray-200 rounded-lg bg-white shadow-sm'>
                           <button 
-                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(cartItemId, item.quantity - 1)}
                             className='px-2.5 py-1 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors rounded-l-lg'
                           >
                             ➖
@@ -102,7 +123,7 @@ const CartDrawer: React.FC = () => {
                             {item.quantity}
                           </span>
                           <button 
-                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(cartItemId, item.quantity + 1)}
                             className='px-2.5 py-1 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors rounded-r-lg'
                           >
                             ➕
@@ -125,13 +146,12 @@ const CartDrawer: React.FC = () => {
               </span>
             </div>
 
-            
             {cart.length > 0 && (
-            <Link href='/checkout' className='w-full' onClick={() => setIsCartOpen(false)}>
-              <button className='w-full bg-pink-600 text-white py-3 px-4 rounded-xl text-lg font-semibold hover:bg-pink-700 transition-colors shadow-sm'>
-                Proceed to Checkout
-              </button>
-            </Link>
+              <Link href='/checkout' className='w-full' onClick={() => setIsCartOpen(false)}>
+                <button className='w-full bg-pink-600 text-white py-3 px-4 rounded-xl text-lg font-semibold hover:bg-pink-700 transition-colors shadow-sm'>
+                  Proceed to Checkout
+                </button>
+              </Link>
             )}
           </div>
 
