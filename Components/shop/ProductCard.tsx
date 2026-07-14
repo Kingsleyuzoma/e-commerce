@@ -117,7 +117,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Clickable Product Image Canvas */}
-        <Link href={`/products/details/${product.slug || product.id}`} className="block aspect-square w-full bg-gray-100 rounded-lg overflow-hidden relative border border-gray-100 mb-4 cursor-pointer">
+        <Link href={`/products/details/${product.name}`} className="block aspect-square w-full bg-gray-100 rounded-lg overflow-hidden relative border border-gray-100 mb-4 cursor-pointer">
           <img
             src={product.imageUrl || "/placeholder-image.jpg"}
             alt={product.name}
@@ -132,9 +132,11 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Clickable Product Name & Static Description */}
-        <Link href={`/products/details/${product.slug || product.id}`} className="block cursor-pointer">
-          <h3 className="font-semibold text-gray-800 text-base line-clamp-1 mb-1 hover:text-gray-600 transition-colors">{product.name}</h3>
-        </Link>
+       <Link href={`/products/details/${product.name}`} className="block cursor-pointer">
+  <h3 className="font-semibold text-gray-800 text-base line-clamp-1 mb-1 hover:text-gray-600 transition-colors">
+    {product.name}
+  </h3>
+</Link>
         <p className="text-xs text-gray-500 line-clamp-2 mb-3 h-8">{product.description}</p>
 
         {/* Colors Selection Buttons */}
