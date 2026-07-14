@@ -43,7 +43,7 @@ const Navbar = () => {
 
       // Merge 'All Products' with the updated database results
       setCategories([
-        { name: 'All Products', href: '/products' },
+        { name: 'All Products', href: '/' },
         ...dynamicCategories
       ]);
     });

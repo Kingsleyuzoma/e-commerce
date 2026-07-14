@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/config/firebase"; // Adjust this path based on your project structure
 import { useAuth } from "@/Context/AuthContext"; // Adjust this path based on your project structure
+import { FcGoogle } from "react-icons/fc";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -118,7 +119,7 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full py-3 px-4 border border-gray-300 rounded-xl shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-all flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          🌐 Sign in with Google
+          <FcGoogle /> Sign in with Google
         </button>
       </div>
     </div>

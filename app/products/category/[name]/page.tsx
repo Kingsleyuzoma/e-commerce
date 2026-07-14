@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import { db } from "@/config/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import ProductCard from "@/Components/shop/ProductCard"; 
+import Pagination from "@/Components/shop/Pagination"; // 💡 Imported Pagination
 import Link from "next/link";
 
 interface PageProps {
@@ -16,6 +17,10 @@ export default function CategoryPage(props: PageProps) {
 
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 🔍 Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20; // 🎯 20 items per page
 
   useEffect(() => {
     if (!categoryName) return;
@@ -54,6 +59,7 @@ export default function CategoryPage(props: PageProps) {
         });
 
         setProducts(loadedProducts);
+        setCurrentPage(1); // Reset page on category change
       } catch (error) {
         console.error("Error fetching category products:", error);
       } finally {
@@ -63,6 +69,11 @@ export default function CategoryPage(props: PageProps) {
 
     fetchCategoryProducts();
   }, [categoryName]);
+
+  // 🧮 Slice products for the active page
+  const indexOfLastProduct = currentPage * itemsPerPage;
+  const indexOfFirstProduct = indexOfLastProduct - itemsPerPage;
+  const currentCategoryProducts = products.slice(indexOfFirstProduct, indexOfLastProduct);
 
   if (isLoading) {
     return (
@@ -82,20 +93,40 @@ export default function CategoryPage(props: PageProps) {
         <span className="capitalize text-gray-600">{categoryName?.replace(/-/g, " ")}</span>
       </div>
 
-      <h1 className="text-2xl font-extrabold text-gray-900 mb-8 capitalize tracking-tight">
-        {categoryName?.replace(/-/g, " ")} Collection
-      </h1>
+      <div className="flex justify-between items-end mb-8">
+        <h1 className="text-2xl font-extrabold text-gray-900 capitalize tracking-tight">
+          {categoryName?.replace(/-/g, " ")} Collection
+        </h1>
+        {products.length > 0 && (
+          <span className="text-xs text-gray-400 font-medium">
+            Showing {indexOfFirstProduct + 1}-{Math.min(indexOfLastProduct, products.length)} of {products.length} items
+          </span>
+        )}
+      </div>
 
       {products.length === 0 ? (
         <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed">
           <p className="text-gray-500 font-medium">No items found inside this category layout section yet.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {currentCategoryProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+
+          {/* 🎯 PAGINATION COMPONENT */}
+          <Pagination
+            totalItems={products.length}
+            itemsPerPage={itemsPerPage}
+            currentPage={currentPage}
+            onPageChange={(page) => {
+              setCurrentPage(page);
+              window.scrollTo({ top: 0, behavior: 'smooth' }); // Smooth scroll back up
+            }}
+          />
+        </>
       )}
     </div>
   );

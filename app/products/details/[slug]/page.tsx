@@ -204,7 +204,7 @@ export default function ProductDetailsPage(props: PageProps) {
           <img
             src={product.imageUrl}
             alt={product.name}
-            className="w-full h-[500px] object-cover"
+            className="w-full h-125 object-cover"
           />
         </div>
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { auth, googleProvider } from '@/config/firebase';
 import { signInWithPopup, createUserWithEmailAndPassword } from "firebase/auth";
+import { FcGoogle } from "react-icons/fc";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -141,7 +142,7 @@ export default function SignUpPage() {
           disabled={loading}
           className="w-full py-3 px-4 border border-gray-300 rounded-xl shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-all flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          🌐 Sign up with Google
+           <FcGoogle />  Sign up with Google
         </button>
 
         {/* Redirect Link */}

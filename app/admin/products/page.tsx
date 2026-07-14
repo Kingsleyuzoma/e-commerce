@@ -163,7 +163,7 @@ export default function ProductsPage() {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">📊 All Products ({products.length})</h1>
       
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[1200px]">
+        <table className="w-full text-left border-collapse min-w-300">
           <thead>
             <tr className="border-b-2 border-gray-200 bg-gray-50 text-gray-700 font-semibold">
               <th className="p-3">#</th>
@@ -256,7 +256,7 @@ export default function ProductsPage() {
 
                     {/* 🏷️ Tags Column */}
                     <td className="p-3">
-                      <div className="flex flex-wrap gap-1 max-w-[150px]">
+                      <div className="flex flex-wrap gap-1 max-w-37.5">
                         {product.tags && product.tags.length > 0 ? (
                           product.tags.map((tag, tagIdx) => (
                             <span key={tagIdx} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[11px]">
