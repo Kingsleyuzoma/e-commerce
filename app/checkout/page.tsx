@@ -1,318 +1,393 @@
-
 "use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useCart } from '@/Context/CartContext';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/Context/AuthContext'; // 🔑 Import your global auth hook
+import React, { useState } from "react";
+import { useCart } from "@/Context/CartContext"; 
+import { calculateUSTax, calculateUSShipping } from "@/utils/usTaxShippingCalculator";
+import { SHIPPING_CONFIG } from "@/config/checkoutConfig";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { reduceProductStock } from "@/utils/inventory";
+import { createOrder } from "@/utils/orders"
 
 export default function CheckoutPage() {
-  const { cart, getTotalPrice, updateQuantity, removeFromCart, clearCart, decreaseStock } = useCart();
-  const { user, login } = useAuth();
+  const { cart, clearCart } = useCart();
   const router = useRouter();
 
-  // 📝 Form States (Added state here)
-  const [shippingData, setShippingData] = useState({
-    fullName: '', email: '', phone: '', address: '', city: '', state: '', postalCode: ''
+  //processing state to disable checkout butoon click spam
+  const [isProcessing, setIsProcessing] = useState(false)
+
+
+  // 📝 Customer Shipping Form State
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "", 
+    zipCode: "",
   });
-  const [paymentData, setPaymentData] = useState({
-    cardName: '', cardNumber: '', expiry: '', cvv: ''
-  });
 
-  // ⚖️ Legal Compliance States
-  const [isTermsAccepted, setIsTermsAccepted] = useState(false);
-  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  // 📜 Terms & Conditions Checkbox State
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
 
-  const [error, setError] = useState('');
+  // 🧮 Calculate Cart Subtotal
+  const subtotal = cart.reduce((total, item) => {
+    const itemPrice = item.product.salePrice || item.product.price;
+    return total + itemPrice * item.quantity;
+  }, 0);
 
-  const handleShippingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setShippingData({ ...shippingData, [e.target.name]: e.target.value });
-    if (error) setError('');
+  // 🚚 Dynamic Tax and Shipping Calculations
+  const shippingCost = formData.state ? calculateUSShipping(subtotal, formData.state) : 0;
+  const taxCost = formData.state ? calculateUSTax(subtotal, formData.state) : 0;
+  const grandTotal = subtotal + shippingCost + taxCost;
+
+  // Calculate how close they are to free shipping (if they are in a state that qualifies)
+  const isNonContiguous = ["AK", "HI", "PR"].includes(formData.state.toUpperCase());
+  const amountLeftForFreeShipping = Math.max(0, SHIPPING_CONFIG.freeShippingThreshold - subtotal);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPaymentData({ ...paymentData, [e.target.name]: e.target.value });
-    if (error) setError('');
-  };
-
-  // 🏁 Process Complete Order (Now Asynchronous)
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 🔒 1. Check Shipping (Added state requirement check here)
-    if (!shippingData.fullName || !shippingData.email || !shippingData.phone || !shippingData.address || !shippingData.city || !shippingData.state || !shippingData.postalCode) {
-      setError('Please fill in all delivery details (including your State) before submitting.');
+    if (!formData.state) {
+      alert("Please select a shipping state to calculate shipping and taxes!");
       return;
     }
 
-    // 🔒 2. Check Payment
-    if (!paymentData.cardName || !paymentData.cardNumber || !paymentData.expiry || !paymentData.cvv) {
-      setError('Please complete your payment configuration inputs to proceed.');
-      return;
-    }
-
-    // 🔒 3. Check Terms Agreement
-    if (!isTermsAccepted) {
-      setError('You must read and agree to the Terms and Conditions to place an order.');
+    if (!agreeToTerms) {
+      alert("You must agree to the Terms and Conditions to proceed!");
       return;
     }
 
     try {
-      // 💥 Success Sequence
-      // ⏳ Wait for Firestore to permanently deduct stock numbers before wiping local states
-      await decreaseStock(cart);
+      setIsProcessing(true);
+
+      // 1. 📉 Deduct stock levels inside transaction
+      await reduceProductStock(cart);
+
+      // 2. 📝 Save Order details to Firestore
+      const orderNumber = await createOrder(
+        formData, // Customer details
+        cart,     // Cart items
+        {         // Financial totals
+          subtotal,
+          shipping: shippingCost,
+          tax: taxCost,
+          grandTotal,
+        }
+      );
+
+      // 3. 🚀 Clear active shopping bag
       clearCart();
-      router.push("/checkout/success");
-    } catch (err) {
-      console.error("Checkout transaction failed: ", err);
-      setError("An inventory error occurred while processing your order. Please try again.");
+
+      // 4. 🚀 Route to your success screen, passing the Order Number in the URL!
+      router.push(`/checkout/success?ord=${orderNumber}`);
+    } catch (error: any) {
+      console.error("Failed to process order:", error);
+      alert(error.message || "An error occurred while placing your order. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  // 🔒 Step 3: Authentication guard layer
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="text-center max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-          <span className="text-4xl mb-4 block">🔒</span>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Secure Checkout</h1>
-          <p className="text-sm text-gray-500 mb-6">
-            Please sign in to your account to complete your order.
-          </p>
-          <Link href="/login" className="w-full block">
-            <button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm mb-4">
-              Sign In Instantly
-            </button>
-          </Link>
-          <p className="text-xs text-gray-400">
-            Don't have an account?{' '}
-            <Link href="/signup" className="text-pink-600 font-medium hover:underline">
-              Sign up here
-            </Link>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   if (cart.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="text-center max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-          <span className="text-6xl mb-4 block">🛒</span>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
-          <Link href="/" className="inline-block mt-4 w-full bg-gray-950 text-white font-medium py-3 rounded-xl hover:bg-pink-600 transition-colors">
-            Return to Shop
-          </Link>
-        </div>
+      <div className="max-w-md mx-auto text-center py-20 px-4">
+        <span className="text-4xl block mb-4">🛒</span>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
+        <p className="text-sm text-gray-500 mb-6">Add some products to your bag before checking out.</p>
+        <Link href="/" className="bg-gray-900 text-white text-xs font-semibold px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors">
+          Go Shopping
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
-      <div className="max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-sm text-gray-800">
+      <h1 className="text-2xl font-extrabold text-gray-900 mb-8 tracking-tight">Secure Checkout</h1>
+      
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-950 tracking-tight">Secure Checkout</h1>
-          <Link href="/" className="text-sm font-semibold text-pink-600 hover:text-pink-700 flex items-center gap-1">
-            ← Back to Shop
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* LEFT COLUMN */}
-          <div className="lg:col-span-7 space-y-6">
-            {error && (
-              <div className="bg-rose-50 text-rose-600 p-4 rounded-xl text-sm font-medium border border-rose-100">
-                ⚠️ {error}
+        {/* 📝 LEFT COLUMN: Shipping Form & Legal Accords */}
+        <form onSubmit={handlePlaceOrder} className="lg:col-span-7 space-y-6">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+            <h2 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">📦 Shipping Address</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  name="fullName"
+                  required
+                  value={formData.fullName}
+                  onChange={handleInputChange}
+                  placeholder="John Doe"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-xs"
+                />
               </div>
-            )}
 
-            {/* Block 1: Shipping */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <span className="bg-pink-100 text-pink-600 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold">1</span>
-                Shipping Details
-              </h2>
-              <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="johndoe@example.com"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  required
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  placeholder="(555) 555-5555"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-xs"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Street Address</label>
+                <input
+                  type="text"
+                  name="address"
+                  required
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  placeholder="123 Main St"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">City</label>
+                <input
+                  type="text"
+                  name="city"
+                  required
+                  value={formData.city}
+                  onChange={handleInputChange}
+                  placeholder="New Orleans"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Full Name</label>
-                  <input type="text" name="fullName" value={shippingData.fullName} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="Jane Doe" />
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">State</label>
+                  <select
+                    name="state"
+                    required
+                    value={formData.state}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-xs bg-white"
+                  >
+                    <option value="">Select State</option>
+                    <option value="AL">Alabama (AL)</option>
+                    <option value="AK">Alaska (AK)</option>
+                    <option value="AZ">Arizona (AZ)</option>
+                    <option value="AR">Arkansas (AR)</option>
+                    <option value="CA">California (CA)</option>
+                    <option value="CO">Colorado (CO)</option>
+                    <option value="CT">Connecticut (CT)</option>
+                    <option value="DE">Delaware (DE)</option>
+                    <option value="FL">Florida (FL)</option>
+                    <option value="GA">Georgia (GA)</option>
+                    <option value="HI">Hawaii (HI)</option>
+                    <option value="ID">Idaho (ID)</option>
+                    <option value="IL">Illinois (IL)</option>
+                    <option value="IN">Indiana (IN)</option>
+                    <option value="IA">Iowa (IA)</option>
+                    <option value="KS">Kansas (KS)</option>
+                    <option value="KY">Kentucky (KY)</option>
+                    <option value="LA">Louisiana (LA) - Nexus 🏠</option>
+                    <option value="ME">Maine (ME)</option>
+                    <option value="MD">Maryland (MD)</option>
+                    <option value="MA">Massachusetts (MA)</option>
+                    <option value="MI">Michigan (MI)</option>
+                    <option value="MN">Minnesota (MN)</option>
+                    <option value="MS">Mississippi (MS)</option>
+                    <option value="MO">Missouri (MO)</option>
+                    <option value="MT">Montana (MT)</option>
+                    <option value="NE">Nebraska (NE)</option>
+                    <option value="NV">Nevada (NV)</option>
+                    <option value="NH">New Hampshire (NH)</option>
+                    <option value="NJ">New Jersey (NJ)</option>
+                    <option value="NM">New Mexico (NM)</option>
+                    <option value="NY">New York (NY)</option>
+                    <option value="NC">North Carolina (NC)</option>
+                    <option value="ND">North Dakota (ND)</option>
+                    <option value="OH">Ohio (OH)</option>
+                    <option value="OK">Oklahoma (OK)</option>
+                    <option value="OR">Oregon (OR)</option>
+                    <option value="PA">Pennsylvania (PA)</option>
+                    {/* 🇵🇷 ADDED PUERTO RICO */}
+                    <option value="PR">Puerto Rico (PR)</option> 
+                    <option value="RI">Rhode Island (RI)</option>
+                    <option value="SC">South Carolina (SC)</option>
+                    <option value="SD">South Dakota (SD)</option>
+                    <option value="TN">Tennessee (TN)</option>
+                    <option value="TX">Texas (TX)</option>
+                    <option value="UT">Utah (UT)</option>
+                    <option value="VT">Vermont (VT)</option>
+                    <option value="VA">Virginia (VA)</option>
+                    <option value="WA">Washington (WA)</option>
+                    <option value="WV">West Virginia (WV)</option>
+                    <option value="WI">Wisconsin (WI)</option>
+                    <option value="WY">Wyoming (WY)</option>
+                  </select>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Email Address</label>
-                    <input type="email" name="email" value={shippingData.email} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="jane@example.com" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Phone Number</label>
-                    <input type="tel" name="phone" value={shippingData.phone} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="08012345678" />
-                  </div>
-                </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Street Address</label>
-                  <input type="text" name="address" value={shippingData.address} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="123 Luxury Lane" />
-                </div>
-                
-                {/* 🗺️ City, State, and Postal Code Grid Breakdown */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">City</label>
-                    <input type="text" name="city" value={shippingData.city} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="Port Harcourt" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">State / Region</label>
-                    <input type="text" name="state" value={shippingData.state} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="Rivers State" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Postal Code</label>
-                    <input type="text" name="postalCode" value={shippingData.postalCode} onChange={handleShippingChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="500101" />
-                  </div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Zip Code</label>
+                  <input
+                    type="text"
+                    name="zipCode"
+                    required
+                    maxLength={5}
+                    value={formData.zipCode}
+                    onChange={handleInputChange}
+                    placeholder="70112"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-xs"
+                  />
                 </div>
               </div>
-            </div>
-
-            {/* Block 2: Payment */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <span className="bg-pink-100 text-pink-600 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold">2</span>
-                Payment Information
-              </h2>
-              <form onSubmit={handlePlaceOrder} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Name on Card</label>
-                  <input type="text" name="cardName" value={paymentData.cardName} onChange={handlePaymentChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="JANE DOE" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Card Number</label>
-                  <input type="text" name="cardNumber" maxLength={16} value={paymentData.cardNumber} onChange={handlePaymentChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="4242 •••• •••• 4242" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Expiration Date</label>
-                    <input type="text" name="expiry" maxLength={5} value={paymentData.expiry} onChange={handlePaymentChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="MM/YY" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Security Code (CVV)</label>
-                    <input type="password" name="cvv" maxLength={3} value={paymentData.cvv} onChange={handlePaymentChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all" placeholder="•••" />
-                  </div>
-                </div>
-                <button type="submit" className="hidden" id="hidden-submit-btn" />
-              </form>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Sidebar Summary */}
-          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 max-h-80 overflow-y-auto space-y-4">
-              <h2 className="text-md font-bold text-gray-900 tracking-wide">Review Cart Items</h2>
-              {cart.map((item) => {
-                const currentPrice = item.product.salePrice ?? item.product.price;
-                const cartItemId = `${item.product.id}-${item.selectedColor || ''}-${item.selectedSize || ''}`;
-                
+          {/* ⚖️ TERMS AND CONDITIONS ACCORD CHECKBOX */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="agreeToTerms"
+              checked={agreeToTerms}
+              onChange={(e) => setAgreeToTerms(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-950 cursor-pointer"
+            />
+            <label htmlFor="agreeToTerms" className="text-xs text-gray-600 leading-relaxed cursor-pointer select-none">
+              I have read and agree to the website's{" "}
+              <Link href="/terms" target="_blank" className="font-bold text-gray-900 underline hover:text-gray-700">
+                Terms and Conditions
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" target="_blank" className="font-bold text-gray-900 underline hover:text-gray-700">
+                Privacy Policy
+              </Link>.
+            </label>
+          </div>
+
+     <button
+            type="submit"
+            disabled={isProcessing}
+            className="w-full bg-gray-900 text-white font-bold py-3.5 px-4 rounded-xl hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm cursor-pointer text-sm"
+          >
+            {isProcessing ? "Processing Order..." : `Complete Purchase ($${grandTotal.toFixed(2)})`}
+          </button>
+
+        </form>
+
+        {/* 💳 RIGHT COLUMN: Order Summary Card */}
+        <div className="lg:col-span-5">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm sticky top-6">
+            <h2 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">🛒 Order Summary</h2>
+            
+            {/* Free Shipping Progress bar */}
+            {!formData.state ? (
+              <p className="text-xs text-gray-500 bg-gray-50 p-2.5 rounded-lg mb-4 font-medium border border-gray-100">
+                Please enter your shipping state to check shipping options.
+              </p>
+            ) : isNonContiguous ? (
+              <p className="text-xs text-amber-800 bg-amber-50/50 p-2.5 rounded-lg mb-4 font-medium border border-amber-100">
+                ✈️ Flat premium rate applies to non-continental shipping destinations (AK, HI, PR).
+              </p>
+            ) : amountLeftForFreeShipping > 0 ? (
+              <p className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-lg mb-4 font-medium border border-amber-100">
+                Add <span className="font-bold">${amountLeftForFreeShipping.toFixed(2)}</span> more to unlock free shipping!
+              </p>
+            ) : (
+              <p className="text-xs text-green-700 bg-green-50 p-2.5 rounded-lg mb-4 font-medium border border-green-100">
+                🎉 Congrats! Your order qualifies for Free Shipping.
+              </p>
+            )}
+
+            {/* List items */}
+            <div className="max-h-48 overflow-y-auto mb-4 pr-1 divide-y divide-gray-100">
+              {cart.map((item, idx) => {
+                const itemPrice = item.product.salePrice || item.product.price;
                 return (
-                  <div key={cartItemId} className="flex items-center justify-between border-b border-gray-50 pb-3 last:border-0 last:pb-0">
-                    <div className="flex items-center gap-3">
-                      <img src={item.product.imageUrl || "/placeholder.jpg"} alt={item.product.name} className="w-12 h-12 object-cover rounded-xl bg-gray-50 border" />
-                      <div>
-                        <h3 className="font-semibold text-gray-800 text-xs line-clamp-1">{item.product.name}</h3>
-                        {(item.selectedColor || item.selectedSize) && (
-                          <div className="flex gap-1 text-[10px] text-gray-500 my-0.5 font-medium">
-                            {item.selectedColor && <span>{item.selectedColor}</span>}
-                            {item.selectedColor && item.selectedSize && <span>•</span>}
-                            {item.selectedSize && <span>Size: {item.selectedSize}</span>}
-                          </div>
-                        )}
-                        <p className="text-xs text-gray-400">${currentPrice.toFixed(2)} each</p>
-                      </div>
+                  <div key={idx} className="flex gap-3 py-3 items-center">
+                    <img 
+                      src={item.product.imageUrl} 
+                      alt={item.product.name} 
+                      className="w-10 h-10 rounded-md object-cover border"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 truncate">{item.product.name}</p>
+                      <p className="text-xs text-gray-400">
+                        Qty: {item.quantity} {item.selectedColor && `| ${item.selectedColor}`} {item.selectedSize && `| Size ${item.selectedSize}`}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold px-2 py-1 bg-gray-100 rounded text-gray-700">Qty: {item.quantity}</span>
-                    </div>
+                    <span className="font-semibold">${(itemPrice * item.quantity).toFixed(2)}</span>
                   </div>
                 );
               })}
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
-              <h2 className="text-lg font-bold text-gray-900">Order Summary</h2>
-              <div className="border-t border-gray-100 pt-4 space-y-3">
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Subtotal</span>
-                  <span>${getTotalPrice().toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-base font-bold text-gray-900 border-t border-gray-100 pt-3">
-                  <span>Total Amount</span>
-                  <span>${getTotalPrice().toFixed(2)}</span>
-                </div>
+            {/* Price Calculations */}
+            <div className="space-y-3 pt-4 border-t border-gray-100 text-gray-600">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span className="font-medium text-gray-800">${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span className="font-medium text-gray-800">
+                  {!formData.state ? (
+                    <span className="text-xs text-gray-400 font-normal">Select state first</span>
+                  ) : shippingCost === 0 ? (
+                    <span className="text-green-600 font-bold">FREE</span>
+                  ) : (
+                    `$${shippingCost.toFixed(2)}`
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Sales Tax (5% LA Only)</span>
+                <span className="font-medium text-gray-800">
+                  {!formData.state ? (
+                    <span className="text-xs text-gray-400 font-normal">Select state first</span>
+                  ) : (
+                    `$${taxCost.toFixed(2)}`
+                  )}
+                </span>
               </div>
 
-              {/* ⚖️ Terms and Conditions Tick Box */}
-              <div className="pt-2 flex items-start gap-2.5">
-                <input 
-                  type="checkbox" 
-                  id="termsCheckbox"
-                  checked={isTermsAccepted}
-                  onChange={(e) => setIsTermsAccepted(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 accent-pink-600 rounded cursor-pointer"
-                />
-                <label htmlFor="termsCheckbox" className="text-xs text-gray-500 leading-tight cursor-pointer select-none">
-                  I have read and agree to the website{' '}
-                  <button 
-                    type="button"
-                    onClick={() => setIsTermsModalOpen(true)}
-                    className="text-pink-600 font-semibold underline hover:text-pink-700"
-                  >
-                    Terms and Conditions
-                  </button>
-                </label>
+              <div className="flex justify-between items-center pt-4 border-t border-gray-100 text-gray-900 font-extrabold text-base">
+                <span>Grand Total</span>
+                <span>${grandTotal.toFixed(2)}</span>
               </div>
-
-              <button 
-                onClick={() => document.getElementById('hidden-submit-btn')?.click()}
-                className="w-full mt-2 bg-gray-950 hover:bg-pink-600 text-white font-semibold py-3 rounded-xl transition-all text-center shadow-md active:scale-[0.99]"
-              >
-                Place Order
-              </button>
             </div>
           </div>
-
         </div>
+
       </div>
-
-      {/* 🔮 TERMS AND CONDITIONS MODAL */}
-      {isTermsModalOpen && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[70vh] flex flex-col shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">Terms and Conditions</h3>
-              <button onClick={() => setIsTermsModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1">✕</button>
-            </div>
-            <div className="p-6 overflow-y-auto space-y-4 text-sm text-gray-600 leading-relaxed">
-              <p className="font-semibold text-gray-800">1. Order Processing & Acceptance</p>
-              <p>By clicking "Place Order", you agree that all stock counts and processed inventory deductions are final representations of point-of-sale layout confirmations.</p>
-              <p className="font-semibold text-gray-800">2. Mock Payment Protocols</p>
-              <p>This store is handling standard validation flows. All details entered into card configurations are validated locally on client device layouts and are not captured maliciously.</p>
-              <p className="font-semibold text-gray-800">3. Shipping Policies</p>
-              <p>Estimated timelines are standard mock calculations subject to live fulfillment settings once database pipelines are active.</p>
-            </div>
-            <div className="p-4 bg-gray-50 border-t border-gray-100 rounded-b-2xl flex justify-end">
-              <button
-                onClick={() => {
-                  setIsTermsAccepted(true);
-                  setIsTermsModalOpen(false);
-                }}
-                className="bg-pink-600 hover:bg-pink-700 text-white font-semibold text-xs py-2.5 px-5 rounded-lg transition-colors"
-              >
-                Accept and Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

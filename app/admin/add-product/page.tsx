@@ -20,6 +20,13 @@ interface CategoryItem {
   slug: string;
 }
 
+// Interface for Sub Image slots
+interface SubImageSlot {
+  file: File | null;
+  preview: string | null;
+  progress: number | null;
+}
+
 export default function AdminProductForm() {
   // 🗃️ Core Form State
   const [name, setName] = useState("");
@@ -48,10 +55,19 @@ export default function AdminProductForm() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
-  // 🖼️ Image Upload State
+  // 🖼️ Main Image Upload State
   const [imageFile, setImageFile] = useState<File | null>(null); 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  // 📸 Sub-Images State (Supports up to 5 additional perspective angles)
+  const [subImages, setSubImages] = useState<SubImageSlot[]>([
+    { file: null, preview: null, progress: null },
+    { file: null, preview: null, progress: null },
+    { file: null, preview: null, progress: null },
+    { file: null, preview: null, progress: null },
+    { file: null, preview: null, progress: null },
+  ]);
 
   let uploadInterval: NodeJS.Timeout;
 
@@ -105,6 +121,50 @@ export default function AdminProductForm() {
         setUploadProgress(currentProgress);
       }
     }, 150);
+  };
+
+  // Handles updating a specific sub-image upload slot
+  const handleSubImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+
+    // Update state for selected slot
+    setSubImages((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        file,
+        preview: previewUrl,
+        progress: 0,
+      };
+      return updated;
+    });
+
+    // Simulate upload progress bar animation
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 20;
+      setSubImages((prev) => {
+        const updated = [...prev];
+        if (progress >= 100) {
+          updated[index].progress = null;
+          clearInterval(interval);
+        } else {
+          updated[index].progress = progress;
+        }
+        return updated;
+      });
+    }, 150);
+  };
+
+  // Clear a selected sub image slot
+  const removeSubImage = (index: number) => {
+    setSubImages((prev) => {
+      const updated = [...prev];
+      updated[index] = { file: null, preview: null, progress: null };
+      return updated;
+    });
   };
 
   const [tempSizes, setTempSizes] = useState<SizeVariant[]>([]);
@@ -161,8 +221,25 @@ export default function AdminProductForm() {
     try {
       setIsPublishing(true); // 🔒 Lock form submission immediately
 
+      // 1. Upload Main Cover Image
       const permanentImageUrl = await uploadProductImage(imageFile, () => {});
 
+      // 2. Upload Selected Sub Images (Only upload slots that have files)
+      const uploadedSubImageUrls: string[] = [];
+      for (const slot of subImages) {
+        if (slot.file) {
+          try {
+            const url = await uploadProductImage(slot.file, () => {});
+            if (url) {
+              uploadedSubImageUrls.push(url);
+            }
+          } catch (uploadErr) {
+            console.error("Error uploading one of the sub-images:", uploadErr);
+          }
+        }
+      }
+
+      // 3. Assemble Payload
       const finalPayload = {
         name,
         brand,
@@ -173,7 +250,8 @@ export default function AdminProductForm() {
         tags: tags.split(",").map(t => t.trim()).filter(Boolean),
         isNew,
         isOnSale,
-        imageUrl: permanentImageUrl, 
+        imageUrl: permanentImageUrl,
+        subImages: uploadedSubImageUrls, // Array containing sub-image urls saved to Firestore
         variants: variants || [], 
         availableStock: totalStock,
         createdAt: new Date(), 
@@ -198,6 +276,13 @@ export default function AdminProductForm() {
       setBaseStock("");
       setImageFile(null);
       setImagePreview(null);
+      setSubImages([
+        { file: null, preview: null, progress: null },
+        { file: null, preview: null, progress: null },
+        { file: null, preview: null, progress: null },
+        { file: null, preview: null, progress: null },
+        { file: null, preview: null, progress: null },
+      ]);
 
     } catch (error) {
       console.error("Error adding document to Firestore: ", error);
@@ -211,10 +296,10 @@ export default function AdminProductForm() {
     <form onSubmit={handleSubmit} className="max-w-xl mx-auto p-6 bg-white shadow-md rounded-lg space-y-6 text-gray-800 text-sm">
       <h2 className="text-xl font-bold border-b pb-2 text-gray-900">📦 Simplified Product Creator</h2>
 
-      {/* 🖼️ Image Upload Field */}
+      {/* 🖼️ Main Image Upload Field */}
       <div className="space-y-2 border-2 border-dashed p-4 rounded-md bg-gray-50 text-center">
         <label className="block font-medium cursor-pointer text-blue-600 hover:underline">
-          📷 Click to Upload Product Image
+          📷 Click to Upload Main Cover Image
           <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" disabled={isPublishing} />
         </label>
         
@@ -230,6 +315,54 @@ export default function AdminProductForm() {
             <img src={imagePreview} alt="Product Preview" className="w-32 h-32 mx-auto mt-2 object-cover rounded shadow" />
           </div>
         )}
+      </div>
+
+      {/* 📸 Sub Images Section (4-6 Alternative angles) */}
+      <div className="p-4 border rounded-md bg-slate-50 space-y-3">
+        <div>
+          <h3 className="font-bold text-gray-900">🖼️ Additional Angle Images (Up to 5)</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">These display as sub-thumbnails beneath the main cover photo on the details page.</p>
+        </div>
+
+        <div className="grid grid-cols-5 gap-2">
+          {subImages.map((slot, index) => (
+            <div key={index} className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-lg bg-white p-1.5 h-24 relative overflow-hidden">
+              {slot.preview ? (
+                <div className="w-full h-full relative group">
+                  <img src={slot.preview} alt={`Sub image ${index + 1}`} className="w-full h-full object-cover rounded" />
+                  <button 
+                    type="button" 
+                    disabled={isPublishing}
+                    onClick={() => removeSubImage(index)}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold hover:bg-red-600 shadow cursor-pointer"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer text-gray-400 hover:text-blue-500 text-center select-none">
+                  <span className="text-xl">+</span>
+                  <span className="text-[9px] font-semibold">Angle {index + 1}</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    disabled={isPublishing}
+                    onChange={(e) => handleSubImageChange(index, e)} 
+                    className="hidden" 
+                  />
+                </label>
+              )}
+
+              {slot.progress !== null && (
+                <div className="absolute inset-0 bg-white/80 flex items-center justify-center p-1">
+                  <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-blue-600 h-1.5 transition-all" style={{ width: `${slot.progress}%` }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* 🏷️ Core Details */}

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, use } from "react";
@@ -26,6 +27,7 @@ interface Product {
   category: string;
   description: string;
   imageUrl: string;
+  subImages?: string[]; // Added: support for 4 to 6 alternative perspective angles
   price: number;
   salePercentage: number;
   isNew: boolean;
@@ -55,6 +57,7 @@ export default function ProductDetailsPage(props: PageProps) {
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState<string | number>("");
   const [quantity, setQuantity] = useState(1);
+  const [activeImage, setActiveImage] = useState(""); // Track selected gallery photo
 
   // ================= FETCH PRODUCT =================
   useEffect(() => {
@@ -85,6 +88,7 @@ export default function ProductDetailsPage(props: PageProps) {
             category: data.category || "",
             description: data.description || "",
             imageUrl: data.imageUrl || "",
+            subImages: data.subImages || [], // Load the sub-images array
             price: Number(data.price) || 0,
             salePercentage: Number(data.salePercentage) || 0,
             isNew: Boolean(data.isNew),
@@ -95,6 +99,7 @@ export default function ProductDetailsPage(props: PageProps) {
           };
 
           setProduct(loadedProduct);
+          setActiveImage(loadedProduct.imageUrl); // Initialize main view photo
 
           // Default first option
           if (loadedProduct.variants && loadedProduct.variants.length > 0) {
@@ -187,6 +192,14 @@ export default function ProductDetailsPage(props: PageProps) {
     alert("Added to cart");
   };
 
+  // Compile the interactive thumbnail images
+  const allImages = [
+    product.imageUrl,
+    ...(product.subImages || [])
+  ].filter(Boolean);
+
+  const displayImage = activeImage || product.imageUrl;
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
       {/* Breadcrumb */}
@@ -199,13 +212,48 @@ export default function ProductDetailsPage(props: PageProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* IMAGE */}
-        <div className="rounded-xl overflow-hidden bg-gray-100">
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            className="w-full h-125 object-cover"
-          />
+        {/* IMAGE SECTION with Dynamic Interactive Thumbnails */}
+        <div className="flex flex-col gap-4">
+          {/* Main Large Image Display */}
+          <div className="rounded-xl overflow-hidden bg-gray-100">
+            <img
+              src={displayImage}
+              alt={product.name}
+              className="w-full h-125 object-cover transition-all duration-200"
+            />
+          </div>
+
+          {/* Alternative Angle Thumbnails Container (Appears if alternative sub-images exist) */}
+          {allImages.length > 1 && (
+            <div className="grid grid-cols-5 gap-2">
+              {allImages.slice(0, 6).map((imgUrl, index) => {
+                const isActive = displayImage === imgUrl;
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => setActiveImage(imgUrl)}
+                    className={`aspect-square rounded-lg overflow-hidden border bg-gray-50 transition-all cursor-pointer relative ${
+                      isActive 
+                        ? "border-pink-600 ring-2 ring-pink-600/10 scale-95" 
+                        : "border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    <img
+                      src={imgUrl}
+                      alt={`${product.name} thumbnail ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {imgUrl === product.imageUrl && (
+                      <span className="absolute bottom-0.5 right-0.5 bg-pink-600 text-[6px] text-white font-black px-0.5 rounded uppercase scale-75 origin-bottom-right">
+                        Cover
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* DETAILS */}
