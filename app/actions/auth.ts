@@ -2,6 +2,28 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/config/firebase";
+
+/**
+ * Sends a password reset email to the specified email address.
+ */
+export const resetUserPassword = async (email: string): Promise<void> => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: any) {
+    // Standard Firebase Auth Error handling
+    let errorMessage = "An error occurred while trying to send the reset email.";
+    
+    if (error.code === "auth/user-not-found") {
+      errorMessage = "No account exists with this email address.";
+    } else if (error.code === "auth/invalid-email") {
+      errorMessage = "Please enter a valid email address.";
+    }
+    
+    throw new Error(errorMessage);
+  }
+};
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "adminsecret2026";
 

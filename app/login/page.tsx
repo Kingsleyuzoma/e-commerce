@@ -7,6 +7,7 @@ import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/config/firebase"; // Adjust this path based on your project structure
 import { useAuth } from "@/Context/AuthContext"; // Adjust this path based on your project structure
 import { FcGoogle } from "react-icons/fc";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,6 +63,19 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-gray-600">Please sign in to your account</p>
         </div>
         
+        <div className="flex items-center justify-between mb-2">
+  <label className="block text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+    Password
+  </label>
+  <Link
+    href="/forgot-password"
+    className="text-[11px] font-bold text-gray-400 hover:text-gray-950 transition-colors"
+  >
+    Forgot password?
+  </Link>
+</div>
+
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {/* ⚠️ Error Banner Section */}
           {error && (

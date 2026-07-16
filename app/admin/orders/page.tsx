@@ -1,70 +1,35 @@
+
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { db } from "@/config/firebase";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import React, { useState } from "react";
+import { useOrdersManager } from "@/hooks/userOrdersManager";
 import { updateOrderStatus, deleteOrder } from "@/utils/admin";
-import Link from "next/link"; // 💡 Imported Link for navigation
-
-interface Order {
-  id: string;
-  orderNumber: string;
-  createdAt: any;
-  status: "pending" | "processing" | "shipped" | "cancelled";
-  customer: {
-    fullName: string;
-    email: string;
-    phone: string;
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
-  items: Array<{
-    productId: string;
-    name: string;
-    price: number;
-    quantity: number;
-    color?: string;
-    size?: string | number;
-    imageUrl: string;
-  }>;
-  financials: {
-    subtotal: number;
-    shipping: number;
-    tax: number;
-    grandTotal: number;
-  };
-}
+import { Order } from "@/hooks/userOrdersManager";
+import Link from "next/link";
+import { downloadOrderReceipt } from "@/utils/receiptGenerator"; // 👈 Imported the receipt downloader
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { 
+    orders, 
+    salesMetrics, 
+    chartData, // 📈 Grab the chart data from the custom hook
+    searchTerm, 
+    setSearchTerm, 
+    statusFilter, 
+    setStatusFilter, 
+    loading 
+  } = useOrdersManager();
+
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  // Set up real-time listener for incoming orders (Guarded by middleware)
-  useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const orderList = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Order[];
-        setOrders(orderList);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Error fetching orders:", error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, []);
 
   // Handle Order Actions
   const handleStatusChange = async (orderId: string, newStatus: string) => {
@@ -90,26 +55,46 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Search & Filter computation
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer.email.toLowerCase().includes(searchQuery.toLowerCase());
+  // Helper to trigger the PDF dynamic receipt generation on demand
+  const handleDownloadReceipt = (order: Order) => {
+    // Mapping keys to match structural receipt parameters
+    const mappedCustomer = {
+      fullName: order.customer.fullName,
+      email: order.customer.email,
+      phone: order.customer.phone,
+      address: order.customer.address,
+      city: order.customer.city,
+      state: order.customer.state,
+      zipCode: order.customer.zipCode,
+      shippingMethod: order.customer.shippingMethod || "standard",
+    };
 
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const mappedCart = order.items.map((item) => ({
+      product: {
+        name: item.name,
+        price: item.price,
+        salePrice: null, // base values parsed inside the document
+      },
+      quantity: item.quantity,
+      selectedColor: item.color || "",
+      selectedSize: item.size || "",
+    }));
 
-    return matchesSearch && matchesStatus;
-  });
+    downloadOrderReceipt(
+      order.orderNumber,
+      mappedCustomer,
+      mappedCart,
+      order.financials
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 text-sm p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* 👋 Header & Navigation Section */}
+        {/* 👋 Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            {/* ⬅️ Return link to Main Dashboard */}
             <Link 
               href="/admin" 
               className="text-xs text-gray-400 hover:text-gray-950 font-bold mb-2 inline-flex items-center gap-1 transition-colors"
@@ -123,9 +108,9 @@ export default function AdminOrdersPage() {
           <div className="flex flex-wrap gap-2">
             <input
               type="text"
-              placeholder="Search order #, customer..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search ID, customer, product..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-gray-900 transition-colors w-full sm:w-64"
             />
             <select
@@ -142,6 +127,81 @@ export default function AdminOrdersPage() {
           </div>
         </div>
 
+        {/* 📊 Sales Dashboard Analytics Area */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          
+          {/* Quick Metrics (Left Block) */}
+          <div className="grid grid-cols-2 gap-4 h-full">
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Today's Sales</p>
+              <p className="text-lg md:text-2xl font-black text-emerald-600 mt-2">${salesMetrics.daily.toFixed(2)}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">This Week</p>
+              <p className="text-lg md:text-2xl font-black text-blue-600 mt-2">${salesMetrics.weekly.toFixed(2)}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">This Month</p>
+              <p className="text-lg md:text-2xl font-black text-purple-600 mt-2">${salesMetrics.monthly.toFixed(2)}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Revenue</p>
+              <p className="text-lg md:text-2xl font-black text-gray-950 mt-2">${salesMetrics.total.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Visual Sales Graph (Right Block - Uses imported Recharts components) */}
+          <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+            <div className="mb-4">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">7-Day Sales Trend</span>
+              <h3 className="font-bold text-sm text-gray-950">Daily Revenues Overview</h3>
+            </div>
+            <div className="w-full h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#9ca3af', fontSize: 10 }}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#9ca3af', fontSize: 10 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1f2937', 
+                      borderRadius: '12px', 
+                      border: 'none', 
+                      color: '#ffffff',
+                      fontSize: '11px'
+                    }}
+                    labelStyle={{ fontWeight: 'bold', color: '#9ca3af' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="Sales" 
+                    stroke="#10b981" 
+                    strokeWidth={2.5}
+                    fillOpacity={1} 
+                    fill="url(#colorSales)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+        </div>
+
         {/* Dashboard Grid split */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Orders List */}
@@ -149,17 +209,17 @@ export default function AdminOrdersPage() {
             <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
               <span className="font-bold text-gray-950 text-xs uppercase tracking-wider">Order Feed</span>
               <span className="bg-gray-200/60 text-gray-600 px-2.5 py-0.5 rounded-full text-[10px] font-bold">
-                {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"}
+                {orders.length} {orders.length === 1 ? "order" : "orders"}
               </span>
             </div>
 
             {loading ? (
               <div className="p-8 text-center text-xs text-gray-400">Loading incoming data stream...</div>
-            ) : filteredOrders.length === 0 ? (
+            ) : orders.length === 0 ? (
               <div className="p-12 text-center text-xs text-gray-400">No orders matching current conditions found.</div>
             ) : (
               <div className="divide-y divide-gray-50 overflow-y-auto max-h-[70vh]">
-                {filteredOrders.map((order) => (
+                {orders.map((order) => (
                   <div
                     key={order.id}
                     onClick={() => setSelectedOrder(order)}
@@ -224,7 +284,7 @@ export default function AdminOrdersPage() {
                   <select
                     value={selectedOrder.status}
                     onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-gray-950 cursor-pointer"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-gray-95) cursor-pointer"
                   >
                     <option value="pending">Pending</option>
                     <option value="processing">Processing</option>
@@ -281,9 +341,23 @@ export default function AdminOrdersPage() {
                     <span className="text-gray-400">Tax</span>
                     <span className="font-medium text-gray-700">${selectedOrder.financials.tax.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between border-t border-gray-50 pt-2 font-bold text-gray-950">
-                    <span>Grand Total</span>
-                    <span>${selectedOrder.financials.grandTotal.toFixed(2)}</span>
+                  
+                  {/* Row Containing Grand Total and Download Button */}
+                  <div className="flex justify-between items-center border-t border-gray-50 pt-3">
+                    <div>
+                      <span className="block font-medium text-gray-400">Grand Total</span>
+                      <span className="font-black text-gray-950 text-base">${selectedOrder.financials.grandTotal.toFixed(2)}</span>
+                    </div>
+
+                    <button
+                      onClick={() => handleDownloadReceipt(selectedOrder)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 hover:border-gray-950 hover:text-gray-950 text-gray-500 font-bold transition-all cursor-pointer bg-white text-[11px]"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                      </svg>
+                      Invoice PDF
+                    </button>
                   </div>
                 </div>
               </div>

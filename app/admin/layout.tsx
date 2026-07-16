@@ -4,8 +4,9 @@
 import { useAuth } from "@/Context/AuthContext"; 
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
-import { useEffect, useState } from "react"; // 🔄 Added useState
+import { useEffect, useState } from "react"; 
 import Link from "next/link";
+import AdminNotificationPanel from "@/Components/admin/AdminNotificationPanel"; // 👈 Imported your notification component
 
 export default function AdminLayout({
   children,
@@ -37,20 +38,27 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 text-sm">
       
       {/* 📱 Mobile Top Header Bar */}
       <div className="md:hidden bg-white border-b border-gray-200 p-4 flex justify-between items-center shadow-sm sticky top-0 z-40">
         <h2 className="text-lg font-bold text-gray-800">Admin Panel</h2>
-        <button 
-          onClick={() => setIsAdminMenuOpen(true)}
-          className="p-2 text-gray-600 hover:text-pink-600 focus:outline-none"
-        >
-          {/* Menu Hamburger Icon */}
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+        
+        {/* Right Action Icons on Mobile */}
+        <div className="flex items-center gap-3">
+          {/* 🔔 Notification Bell inside mobile header */}
+          <AdminNotificationPanel />
+          
+          <button 
+            onClick={() => setIsAdminMenuOpen(true)}
+            className="p-2 text-gray-600 hover:text-gray-900 focus:outline-none"
+          >
+            {/* Menu Hamburger Icon */}
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* 📁 Sidebar Navigation (Responsive Drawer) */}
@@ -108,10 +116,40 @@ export default function AdminLayout({
         />
       )}
 
-      {/* 🖥️ Main Content Area */}
-      <main className="flex-1 p-6 md:p-8">
-        {children}
-      </main>
+      {/* 🖥️ Main Viewport Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        
+        {/* 🖥️ Desktop Navigation Utility Bar (Hidden on Mobile) */}
+        <header className="hidden md:flex h-16 border-b border-gray-200 bg-white items-center justify-between px-8 sticky top-0 z-30">
+          <div>
+            <h1 className="font-bold text-gray-800 text-sm">Store Management</h1>
+            <p className="text-[11px] text-gray-400">Control panel & live store analytics</p>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <Link 
+              href="/" 
+              className="text-xs text-gray-500 hover:text-gray-900 transition-colors font-medium"
+            >
+              View Storefront
+            </Link>
+
+            {/* 🔔 Admin Notification Panel Dropdown */}
+            <AdminNotificationPanel />
+
+            {/* Profile Placeholder */}
+            <div className="h-8 w-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-[11px] font-bold">
+              AD
+            </div>
+          </div>
+        </header>
+
+        {/* 🖥️ Main Page Content Container */}
+        <main className="flex-1 p-6 md:p-8">
+          {children}
+        </main>
+      </div>
+
     </div>
   );
 }

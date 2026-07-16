@@ -1,21 +1,26 @@
+
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useCart } from "@/Context/CartContext"; 
 import { calculateUSTax, calculateUSShipping } from "@/utils/usTaxShippingCalculator";
 import { SHIPPING_CONFIG } from "@/config/checkoutConfig";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { reduceProductStock } from "@/utils/inventory";
-import { createOrder } from "@/utils/orders"
+import { createOrder } from "@/utils/orders";
+
+// 🔔 Notification & Receipt Utilities Import
+import { downloadOrderReceipt } from "@/utils/receiptGenerator";
+import { triggerOrderNotification, requestNotificationPermission } from "@/utils/notification";
+import { createPersistentNotification } from "@/utils/dbNotification";
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart();
   const router = useRouter();
 
-  //processing state to disable checkout butoon click spam
-  const [isProcessing, setIsProcessing] = useState(false)
-
+  // Processing state to disable checkout button click spam
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // 📝 Customer Shipping Form State
   const [formData, setFormData] = useState({
@@ -28,8 +33,16 @@ export default function CheckoutPage() {
     zipCode: "",
   });
 
+  // 🚀 Shipping Method State (Standard is checked/selected by default)
+  const [shippingMethod, setShippingMethod] = useState<"standard" | "express">("standard");
+
   // 📜 Terms & Conditions Checkbox State
   const [agreeToTerms, setAgreeToTerms] = useState(false);
+
+  // 📯 Request notification permissions as soon as they land on Checkout page
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   // 🧮 Calculate Cart Subtotal
   const subtotal = cart.reduce((total, item) => {
@@ -38,7 +51,14 @@ export default function CheckoutPage() {
   }, 0);
 
   // 🚚 Dynamic Tax and Shipping Calculations
-  const shippingCost = formData.state ? calculateUSShipping(subtotal, formData.state) : 0;
+  const baseShippingCost = formData.state ? calculateUSShipping(subtotal, formData.state) : 0;
+  
+  // Dynamic calculation: If they choose express, standard shipping gets a premium upgrade (e.g., base + $10)
+  const shippingCost = useMemo(() => {
+    if (!formData.state) return 0;
+    return shippingMethod === "express" ? baseShippingCost + 10.00 : baseShippingCost;
+  }, [formData.state, baseShippingCost, shippingMethod]);
+
   const taxCost = formData.state ? calculateUSTax(subtotal, formData.state) : 0;
   const grandTotal = subtotal + shippingCost + taxCost;
 
@@ -75,7 +95,10 @@ export default function CheckoutPage() {
 
       // 2. 📝 Save Order details to Firestore
       const orderNumber = await createOrder(
-        formData, // Customer details
+        {
+          ...formData,
+          shippingMethod, // 👈 Dynamically save shipping selection to customer profiles
+        }, 
         cart,     // Cart items
         {         // Financial totals
           subtotal,
@@ -85,10 +108,29 @@ export default function CheckoutPage() {
         }
       );
 
-      // 3. 🚀 Clear active shopping bag
+      // 3. 🔔 Save persistent notification inside Admin Panel Database
+      await createPersistentNotification(
+        "New Order Placed! 🎉",
+        `Order #${orderNumber} has been submitted by customer: ${formData.fullName}`,
+        "order_placed",
+        { orderNumber, grandTotal }
+      );
+
+      // 4. 💻 Fire Local Client Browser Native System Notification
+      triggerOrderNotification(orderNumber, grandTotal);
+
+      // 5. 📄 Auto-download Invoice PDF receipt 
+      downloadOrderReceipt(
+        orderNumber,
+        { ...formData, shippingMethod },
+        cart,
+        { subtotal, shipping: shippingCost, tax: taxCost, grandTotal }
+      );
+
+      // 6. 🚀 Clear active shopping bag
       clearCart();
 
-      // 4. 🚀 Route to your success screen, passing the Order Number in the URL!
+      // 7. 🚀 Route to your success screen, passing the Order Number in the URL!
       router.push(`/checkout/success?ord=${orderNumber}`);
     } catch (error: any) {
       console.error("Failed to process order:", error);
@@ -238,7 +280,6 @@ export default function CheckoutPage() {
                     <option value="OK">Oklahoma (OK)</option>
                     <option value="OR">Oregon (OR)</option>
                     <option value="PA">Pennsylvania (PA)</option>
-                    {/* 🇵🇷 ADDED PUERTO RICO */}
                     <option value="PR">Puerto Rico (PR)</option> 
                     <option value="RI">Rhode Island (RI)</option>
                     <option value="SC">South Carolina (SC)</option>
@@ -272,6 +313,68 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {/* 📦 SELECTABLE SHIPPING OPTIONS (STANDARD IS DEFAULT) */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+            <h2 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">⚡ Choose Shipping Method</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Standard Option (Default) */}
+              <label 
+                onClick={() => setShippingMethod("standard")}
+                className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  shippingMethod === "standard" 
+                    ? "border-gray-950 bg-gray-50/50" 
+                    : "border-gray-150 hover:border-gray-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="radio"
+                    name="shippingSelection"
+                    checked={shippingMethod === "standard"}
+                    onChange={() => setShippingMethod("standard")}
+                    className="h-4 w-4 text-gray-900 border-gray-300 focus:ring-gray-950 accent-gray-950"
+                  />
+                  <div>
+                    <span className="font-bold text-gray-950 block text-xs">Standard Shipping</span>
+                    <span className="text-[10px] text-gray-400 block mt-0.5">Delivered in 3-5 business days</span>
+                  </div>
+                </div>
+                <span className="font-bold text-xs text-gray-900">
+                  {baseShippingCost === 0 ? "FREE" : `$${baseShippingCost.toFixed(2)}`}
+                </span>
+              </label>
+
+              {/* Express Option (Check/Click to select) */}
+              <label 
+                onClick={() => setShippingMethod("express")}
+                className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  shippingMethod === "express" 
+                    ? "border-gray-950 bg-gray-50/50" 
+                    : "border-gray-150 hover:border-gray-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="radio"
+                    name="shippingSelection"
+                    checked={shippingMethod === "express"}
+                    onChange={() => setShippingMethod("express")}
+                    className="h-4 w-4 text-gray-900 border-gray-300 focus:ring-gray-950 accent-gray-950"
+                  />
+                  <div>
+                    <span className="font-bold text-gray-950 block text-xs">Express Shipping ⚡</span>
+                    <span className="text-[10px] text-gray-400 block mt-0.5">Delivered in 1-2 business days</span>
+                  </div>
+                </div>
+                <span className="font-bold text-xs text-emerald-600">
+                  + $10.00
+                </span>
+              </label>
+
+            </div>
+          </div>
+
           {/* ⚖️ TERMS AND CONDITIONS ACCORD CHECKBOX */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3">
             <input
@@ -293,7 +396,7 @@ export default function CheckoutPage() {
             </label>
           </div>
 
-     <button
+          <button
             type="submit"
             disabled={isProcessing}
             className="w-full bg-gray-900 text-white font-bold py-3.5 px-4 rounded-xl hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm cursor-pointer text-sm"
@@ -357,7 +460,7 @@ export default function CheckoutPage() {
                 <span className="font-medium text-gray-800">${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Shipping</span>
+                <span>Shipping ({shippingMethod === "express" ? "Express ⚡" : "Standard"})</span>
                 <span className="font-medium text-gray-800">
                   {!formData.state ? (
                     <span className="text-xs text-gray-400 font-normal">Select state first</span>
