@@ -25,6 +25,7 @@ type Product = {
   description: string;
   price: number;
   salePercentage: number;
+  costPrice: number; // 🎯 SAVED: Explicitly tracking cost parameters
   tags: string[];
   isNew: boolean;
   isOnSale: boolean;
@@ -56,6 +57,7 @@ export default function ProductsPage() {
           description: data.description || "",
           price: Number(data.price) || 0,
           salePercentage: Number(data.salePercentage) || 0,
+          costPrice: Number(data.costPrice) || 0, // 🎯 SAVED: Mapping cost metrics
           tags: Array.isArray(data.tags) ? data.tags : [],
           isNew: Boolean(data.isNew),
           isOnSale: Boolean(data.isOnSale),
@@ -105,6 +107,7 @@ export default function ProductsPage() {
         description: editingProduct.description,
         price: Number(editingProduct.price),
         salePercentage: Number(editingProduct.salePercentage) || 0,
+        costPrice: Number(editingProduct.costPrice) || 0, // 🎯 SAVED: Upating back down to Firestore docs
         tags: editingProduct.tags || [],
         isNew: Boolean(editingProduct.isNew),
         isOnSale: Boolean(editingProduct.isOnSale),
@@ -165,13 +168,18 @@ export default function ProductsPage() {
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-300">
           <thead>
-            <tr className="border-b-2 border-gray-200 bg-gray-50 text-gray-700 font-semibold">
+            <tr className="border-b-2 border-gray-200 bg-gray-50 text-gray-700 font-semibold text-xs uppercase tracking-wider">
               <th className="p-3">#</th>
               <th className="p-3">Image</th>
               <th className="p-3">Name</th>
               <th className="p-3">Description</th>
               <th className="p-3">Category / Brand</th>
-              <th className="p-3">Price</th>
+              
+              {/* 🎯 HEADERS: Added financial layout metrics */}
+              <th className="p-3">Cost Price</th>
+              <th className="p-3">Retail Price</th>
+              <th className="p-3">Est. Profit</th>
+              
               <th className="p-3">Stock</th> 
               <th className="p-3">Variants</th>
               <th className="p-3">Badges</th>
@@ -182,13 +190,22 @@ export default function ProductsPage() {
           <tbody>
             {displayedProducts.length === 0 ? (
               <tr>
-                <td colSpan={11} className="p-8 text-center text-gray-400">
+                <td colSpan={13} className="p-8 text-center text-gray-400">
                   No products found.
                 </td>
               </tr>
             ) : (
               displayedProducts.map((product, index) => {
                 const rowNumber = startIndex + index + 1;
+                
+                // 🧮 Calculate pricing and profit parameters
+                const retailPrice = product.isOnSale && product.salePercentage > 0 
+                  ? product.price * (1 - product.salePercentage / 100) 
+                  : product.price;
+                const cost = product.costPrice || 0;
+                const profit = retailPrice - cost;
+                const marginPercentage = retailPrice > 0 ? ((profit / retailPrice) * 100).toFixed(0) : "0";
+
                 return (
                   <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50 text-gray-600 text-sm">
                     <td className="p-3 font-medium text-gray-900">{rowNumber}</td>
@@ -209,13 +226,25 @@ export default function ProductsPage() {
                       <div className="text-gray-900 font-medium">{product.category}</div>
                       <div className="text-xs text-gray-400">{product.brand}</div>
                     </td>
+                    
+                    {/* 💰 CELLS: Rendered new finance values columns */}
+                    <td className="p-3 font-medium text-gray-600">
+                      ${cost.toFixed(2)}
+                    </td>
                     <td className="p-3">
-                      <div className="font-semibold text-gray-900">${product.price.toFixed(2)}</div>
+                      <div className="font-semibold text-gray-900">${retailPrice.toFixed(2)}</div>
                       {product.isOnSale && product.salePercentage > 0 && (
-                        <div className="text-xs text-green-600">-{product.salePercentage}% Off</div>
+                        <div className="text-[10px] text-green-600 font-bold uppercase">-{product.salePercentage}% Sale</div>
                       )}
                     </td>
-                    <td className="p-3 font-semibold">{product.availableStock}</td> 
+                    <td className="p-3">
+                      <div className={`font-bold ${profit >= 0 ? "text-gray-900" : "text-red-600"}`}>
+                        ${profit.toFixed(2)}
+                      </div>
+                      <div className="text-[10px] text-gray-400 font-medium">{marginPercentage}% Margin</div>
+                    </td>
+
+                    <td className="p-3 font-semibold text-gray-900">{product.availableStock}</td> 
                     
                     {/* 🎨 Variants Column */}
                     <td className="p-3">
@@ -376,9 +405,21 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              {/* MODAL PRICING UPDATES: Added input item for Cost Pricing configuration adjustments */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-700"
+                    value={editingProduct.costPrice}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, costPrice: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Retail Price ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -388,15 +429,16 @@ export default function ProductsPage() {
                     onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Stock (Calculated)</label>
-                  <input
-                    type="number"
-                    disabled
-                    className="w-full p-2 border border-gray-300 rounded bg-gray-100 font-semibold text-gray-600 cursor-not-allowed"
-                    value={editingProduct.availableStock}
-                  />
-                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total Stock (Calculated)</label>
+                <input
+                  type="number"
+                  disabled
+                  className="w-full p-2 border border-gray-300 rounded bg-gray-100 font-semibold text-gray-600 cursor-not-allowed"
+                  value={editingProduct.availableStock}
+                />
               </div>
 
               {/* 🎨 Dynamic Variants Editor Section */}

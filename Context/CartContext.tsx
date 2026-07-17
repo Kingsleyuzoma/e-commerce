@@ -22,6 +22,7 @@ export interface Product {
   description: string;
   price: number;
   salePrice?: number;
+  costPrice?: number; // 🎯 SAVED: Added here so it maps cleanly from Firestore documents
   salePercentage?: number;
   category: string;
   isNew?: boolean;
@@ -49,7 +50,7 @@ interface CartContextType {
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
   getTotalPrice: () => number;
-  triggerToast: (message: string) => void; // 👈 Expose toast control
+  triggerToast: (message: string) => void; 
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);

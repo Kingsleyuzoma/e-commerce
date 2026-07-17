@@ -23,6 +23,7 @@ export default function AdminOrdersPage() {
   const { 
     orders, 
     salesMetrics, 
+    profitMetrics, 
     chartData, 
     uniqueCustomersCount,
     totalRefundedMoney,
@@ -39,7 +40,6 @@ export default function AdminOrdersPage() {
   const [refundAmount, setRefundAmount] = useState<string>("");
   const [refundedItemsState, setRefundedItemsState] = useState<{ [productId: string]: boolean }>({});
 
-  // Handle Order Actions
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
       await updateOrderStatus(orderId, newStatus);
@@ -63,7 +63,6 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // 💸 Process Refund in Firestore
   const handleIssueRefund = async () => {
     if (!selectedOrder) return;
 
@@ -82,14 +81,13 @@ export default function AdminOrdersPage() {
     }
 
     try {
-      // Map across item objects toggling status
       const updatedItems = selectedOrder.items.map((item) => {
         const isSelectedForRefund = refundedItemsState[item.productId];
         if (isSelectedForRefund) {
           return {
             ...item,
             refunded: true,
-            refundedQuantity: item.quantity, // Default to full quantity refund
+            refundedQuantity: item.quantity,
           };
         }
         return item;
@@ -104,7 +102,6 @@ export default function AdminOrdersPage() {
 
       await updateDoc(orderRef, updatePayload);
 
-      // Locally update currently viewed state structure
       setSelectedOrder((prev) => {
         if (!prev) return null;
         return {
@@ -117,7 +114,6 @@ export default function AdminOrdersPage() {
         };
       });
 
-      // Clear input values
       setRefundAmount("");
       setRefundedItemsState({});
       setShowRefundPanel(false);
@@ -135,7 +131,6 @@ export default function AdminOrdersPage() {
     }));
   };
 
-  // Helper to trigger the PDF dynamic receipt generation on demand
   const handleDownloadReceipt = (order: Order) => {
     const mappedCustomer = {
       fullName: order.customer.fullName,
@@ -171,7 +166,6 @@ export default function AdminOrdersPage() {
     <div className="min-h-screen bg-gray-50 text-gray-800 text-sm p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* 👋 Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <Link 
@@ -206,44 +200,41 @@ export default function AdminOrdersPage() {
           </div>
         </div>
 
-        {/* 📊 Sales Dashboard Analytics Area */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           
-          {/* Quick Metrics (Left Block) */}
           <div className="grid grid-cols-2 gap-4 h-full">
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Today's Sales</p>
               <p className="text-lg md:text-2xl font-black text-emerald-600 mt-2">${salesMetrics.daily.toFixed(2)}</p>
+              <p className="text-[10px] text-emerald-700 font-bold bg-emerald-50/50 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.daily.toFixed(2)}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">This Month</p>
               <p className="text-lg md:text-2xl font-black text-purple-600 mt-2">${salesMetrics.monthly.toFixed(2)}</p>
+              <p className="text-[10px] text-purple-700 font-bold bg-purple-50/50 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.monthly.toFixed(2)}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Revenue</p>
               <p className="text-lg md:text-2xl font-black text-gray-950 mt-2">${salesMetrics.total.toFixed(2)}</p>
+              <p className="text-[10px] text-gray-950 font-bold bg-gray-100 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.total.toFixed(2)}</p>
             </div>
             
-            {/* 👥 Unique Customers Card */}
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Customers</p>
               <p className="text-lg md:text-2xl font-black text-blue-600 mt-2">{uniqueCustomersCount}</p>
             </div>
 
-            {/* 💸 Total Refunded Money Card */}
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Refunded Cash</p>
               <p className="text-lg md:text-2xl font-black text-rose-600 mt-2">${totalRefundedMoney.toFixed(2)}</p>
             </div>
 
-            {/* 📦 Total Refunded Products Card */}
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Refunded Items</p>
               <p className="text-lg md:text-2xl font-black text-amber-600 mt-2">{totalRefundedProducts} items</p>
             </div>
           </div>
 
-          {/* Visual Sales Graph (Right Block - Uses imported Recharts components) */}
           <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
             <div className="mb-4">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">7-Day Sales Trend</span>
@@ -259,35 +250,13 @@ export default function AdminOrdersPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#9ca3af', fontSize: 10 }}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#9ca3af', fontSize: 10 }}
-                  />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10 }} />
                   <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1f2937', 
-                      borderRadius: '12px', 
-                      border: 'none', 
-                      color: '#ffffff',
-                      fontSize: '11px'
-                    }}
-                    labelStyle={{ fontWeight: 'bold', color: '#9ca3af' }}
+                    contentStyle={{ backgroundColor: '#1f2937', borderRadius: '12px', border: 'none', color: '#ffffff', fontSize: '11px' }}
+                    labelStyle={{ fontSpread: 'bold', color: '#9ca3af' }}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="Sales" 
-                    stroke="#10b981" 
-                    strokeWidth={2.5}
-                    fillOpacity={1} 
-                    fill="url(#colorSales)" 
-                  />
+                  <Area type="monotone" dataKey="Sales" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -295,9 +264,7 @@ export default function AdminOrdersPage() {
 
         </div>
 
-        {/* Dashboard Grid split */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Orders List */}
           <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
               <span className="font-bold text-gray-950 text-xs uppercase tracking-wider">Order Feed</span>
@@ -358,11 +325,9 @@ export default function AdminOrdersPage() {
             )}
           </div>
 
-          {/* Detailed Order Panel */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-fit">
             {selectedOrder ? (
               <div className="space-y-6">
-                {/* Panel Header */}
                 <div className="flex justify-between items-start border-b border-gray-100 pb-4">
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Selected Order</span>
@@ -376,13 +341,12 @@ export default function AdminOrdersPage() {
                   </button>
                 </div>
 
-                {/* Status Updater */}
                 <div>
                   <label className="block text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-2">Fulfillment Status</label>
                   <select
                     value={selectedOrder.status}
                     onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-gray-95) cursor-pointer"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-gray-950 cursor-pointer"
                   >
                     <option value="pending">Pending</option>
                     <option value="processing">Processing</option>
@@ -391,16 +355,14 @@ export default function AdminOrdersPage() {
                   </select>
                 </div>
 
-                {/* Customer Information */}
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2 border border-gray-50">
                   <div className="flex justify-between items-center">
                     <h3 className="text-xs font-bold text-gray-950 uppercase tracking-wider">Shipping Details</h3>
-                    {/* Refund Actions Panel Trigger */}
                     <button
                       onClick={() => setShowRefundPanel(!showRefundPanel)}
                       className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
                         showRefundPanel 
-                          ? "bg-gray-200 text-gray-800 hover:bg-gray-350"
+                          ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
                           : "bg-rose-50 text-rose-600 hover:bg-rose-100"
                       }`}
                     >
@@ -416,12 +378,10 @@ export default function AdminOrdersPage() {
                   </div>
                 </div>
 
-                {/* 💸 Process Refund Interactive Panel */}
                 {showRefundPanel && (
                   <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4 space-y-3 transition-all duration-200">
                     <h3 className="text-xs font-bold text-rose-950 uppercase tracking-wider">Process Refund</h3>
                     
-                    {/* Step 1: Check Items to Refund */}
                     <div className="space-y-1.5">
                       <p className="text-[10px] text-rose-800 font-bold">Select items returned/refunded:</p>
                       {selectedOrder.items.map((item) => (
@@ -444,7 +404,6 @@ export default function AdminOrdersPage() {
                       ))}
                     </div>
 
-                    {/* Step 2: Refund Amount Input */}
                     <div className="space-y-1">
                       <label className="block text-[10px] text-rose-800 font-bold">Amount to Credit back ($):</label>
                       <input
@@ -456,7 +415,6 @@ export default function AdminOrdersPage() {
                       />
                     </div>
 
-                    {/* Step 3: Action Buttons */}
                     <button
                       onClick={handleIssueRefund}
                       className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-3 rounded-lg text-xs transition-colors cursor-pointer flex justify-center items-center gap-1"
@@ -466,41 +424,58 @@ export default function AdminOrdersPage() {
                   </div>
                 )}
 
-                {/* Product Items Purchased */}
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-gray-950 uppercase tracking-wider">Line Items</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {selectedOrder.items.map((item, index) => (
-                      <div key={index} className="flex gap-3 items-center border-b border-gray-50 pb-2 last:border-0">
-                        <div className="relative">
-                          <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-cover rounded-lg border bg-gray-50" />
-                          {item.refunded && (
-                            <span className="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 text-[8px] leading-none font-bold" title="Refunded">
-                              ↩
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-xs font-bold text-gray-950 truncate">{item.name}</p>
-                            {item.refunded && (
-                              <span className="bg-rose-50 text-rose-600 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">Refunded</span>
-                            )}
+                    {selectedOrder.items.map((item, index) => {
+                      // 🎯 FIX: Core dynamic tracking fallback math for old records
+                      const itemRetailPrice = item.price || 0;
+                      const itemCostPrice = item.costPrice !== undefined ? item.costPrice : (itemRetailPrice * 0.6);
+                      const singleItemProfit = itemRetailPrice - itemCostPrice;
+                      const totalItemProfit = singleItemProfit * item.quantity;
+
+                      return (
+                        <div key={index} className="flex flex-col border-b border-gray-50 pb-2.5 last:border-0 last:pb-0">
+                          <div className="flex gap-3 items-center">
+                            <div className="relative flex-shrink-0">
+                              <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-cover rounded-lg border bg-gray-50" />
+                              {item.refunded && (
+                                <span className="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 text-[8px] leading-none font-bold">
+                                  ↩
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-bold text-gray-950 truncate">{item.name}</p>
+                                {item.refunded && (
+                                  <span className="bg-rose-50 text-rose-600 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">Refunded</span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-400 font-medium">
+                                {item.color && `Color: ${item.color}`} {item.size && ` | Size: ${item.size}`}
+                              </p>
+                            </div>
+                            <div className="text-right text-xs flex-shrink-0">
+                              <p className="font-bold text-gray-900">${(itemRetailPrice * item.quantity).toFixed(2)}</p>
+                              <p className="text-[10px] text-gray-400 font-medium">{item.quantity}x @ ${itemRetailPrice}</p>
+                            </div>
                           </div>
-                          <p className="text-[10px] text-gray-400 font-medium">
-                            {item.color && `Color: ${item.color}`} {item.size && ` | Size: ${item.size}`}
-                          </p>
+
+                          {/* 💸 Private Individual Product Profit Display Overlay Tag */}
+                          <div className="flex justify-between items-center bg-purple-50/40 text-[10px] font-semibold text-purple-800 rounded-md px-2 py-1 mt-1.5 border border-purple-100/30">
+                            <span>Private Tracking Metrics:</span>
+                            <span>
+                              Cost: <span className="font-bold text-gray-600">${itemCostPrice.toFixed(2)}</span> | 
+                              Profit: <span className="font-bold text-purple-700">+${totalItemProfit.toFixed(2)}</span>
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-right text-xs">
-                          <p className="font-bold text-gray-900">${(item.price * item.quantity).toFixed(2)}</p>
-                          <p className="text-[10px] text-gray-400 font-medium">{item.quantity}x @ ${item.price}</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Financial Recap */}
                 <div className="border-t border-gray-100 pt-4 space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Subtotal</span>
@@ -515,7 +490,6 @@ export default function AdminOrdersPage() {
                     <span className="font-medium text-gray-700">${selectedOrder.financials.tax.toFixed(2)}</span>
                   </div>
                   
-                  {/* Total Refund Value Row */}
                   {(selectedOrder.financials.refundedAmount || 0) > 0 && (
                     <div className="flex justify-between text-rose-600 font-bold bg-rose-50/50 p-2 rounded-lg border border-rose-100/50">
                       <span>Amount Refunded</span>
@@ -523,7 +497,6 @@ export default function AdminOrdersPage() {
                     </div>
                   )}
                   
-                  {/* Row Containing Grand Total and Download Button */}
                   <div className="flex justify-between items-center border-t border-gray-50 pt-3">
                     <div>
                       <span className="block font-medium text-gray-400">Grand Total</span>

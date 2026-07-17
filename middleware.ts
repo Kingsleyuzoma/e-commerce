@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
     if (!userSession) {
       // If not authenticated, redirect them to the customer sign-in page
       // We also append the '?redirect=/checkout' parameter so they return straight to checkout after signing in!
-      const signInUrl = new URL("/signin", request.url);
+      const signInUrl = new URL("/login", request.url);
       signInUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(signInUrl);
     }

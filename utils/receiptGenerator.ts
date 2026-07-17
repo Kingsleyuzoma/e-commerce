@@ -10,12 +10,26 @@ export const downloadOrderReceipt = (orderNumber: string, customer: any, cart: a
   doc.setFontSize(20);
   doc.text("YOUR STORE RECEIPT", 14, 20);
 
+  // --- ⏱️ Generate Full Date and Time Stamp ---
+  const now = new Date();
+  const formattedDate = now.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const formattedTime = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  const fullTimestamp = `${formattedDate} at ${formattedTime}`;
+
   // --- Order Metadata ---
   doc.setFont("Helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(`Order Number: #${orderNumber}`, 14, 28);
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 33);
+  doc.text(`Date Placed: ${fullTimestamp}`, 14, 33); // 🎯 UPDATED: Renders time beautifully onto the document layout
 
   // --- Customer & Shipping Info ---
   doc.setFont("Helvetica", "bold");

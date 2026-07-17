@@ -1,3 +1,4 @@
+
 "use client";
 import { db } from "@/config/firebase"; 
 import React, { useState, useEffect } from "react";
@@ -20,7 +21,6 @@ interface CategoryItem {
   slug: string;
 }
 
-// Interface for Sub Image slots
 interface SubImageSlot {
   file: File | null;
   preview: string | null;
@@ -34,6 +34,7 @@ export default function AdminProductForm() {
   const [category, setCategory] = useState(""); 
   const [description, setDescription] = useState(""); 
   const [price, setPrice] = useState("");
+  const [costPrice, setCostPrice] = useState(""); // 👈 Added Cost Price State
   const [salePercentage, setSalePercentage] = useState("");
   const [tags, setTags] = useState(""); 
   const [isNew, setIsNew] = useState(false);
@@ -60,7 +61,7 @@ export default function AdminProductForm() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
-  // 📸 Sub-Images State (Supports up to 5 additional perspective angles)
+  // 📸 Sub-Images State
   const [subImages, setSubImages] = useState<SubImageSlot[]>([
     { file: null, preview: null, progress: null },
     { file: null, preview: null, progress: null },
@@ -123,25 +124,18 @@ export default function AdminProductForm() {
     }, 150);
   };
 
-  // Handles updating a specific sub-image upload slot
   const handleSubImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const previewUrl = URL.createObjectURL(file);
 
-    // Update state for selected slot
     setSubImages((prev) => {
       const updated = [...prev];
-      updated[index] = {
-        file,
-        preview: previewUrl,
-        progress: 0,
-      };
+      updated[index] = { file, preview: previewUrl, progress: 0 };
       return updated;
     });
 
-    // Simulate upload progress bar animation
     let progress = 0;
     const interval = setInterval(() => {
       progress += 20;
@@ -158,7 +152,6 @@ export default function AdminProductForm() {
     }, 150);
   };
 
-  // Clear a selected sub image slot
   const removeSubImage = (index: number) => {
     setSubImages((prev) => {
       const updated = [...prev];
@@ -187,15 +180,13 @@ export default function AdminProductForm() {
     setTempSizes([]);
   };
 
-  // 🚀 Form Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent double clicks if already processing
     if (isPublishing) return;
 
-    if (!name || !price || !description || !category) {
-      alert("Please fill out the required core fields (Name, Category, Price, and Description).");
+    if (!name || !price || !costPrice || !description || !category) {
+      alert("Please fill out the required core fields (Name, Category, Price, Cost Price, and Description).");
       return;
     }
 
@@ -219,56 +210,50 @@ export default function AdminProductForm() {
     }
 
     try {
-      setIsPublishing(true); // 🔒 Lock form submission immediately
+      setIsPublishing(true);
 
-      // 1. Upload Main Cover Image
       const permanentImageUrl = await uploadProductImage(imageFile, () => {});
 
-      // 2. Upload Selected Sub Images (Only upload slots that have files)
       const uploadedSubImageUrls: string[] = [];
       for (const slot of subImages) {
         if (slot.file) {
           try {
             const url = await uploadProductImage(slot.file, () => {});
-            if (url) {
-              uploadedSubImageUrls.push(url);
-            }
+            if (url) uploadedSubImageUrls.push(url);
           } catch (uploadErr) {
             console.error("Error uploading one of the sub-images:", uploadErr);
           }
         }
       }
 
-      // 3. Assemble Payload
+      // 🛠️ Captured costPrice added to backend payload structure safely
       const finalPayload = {
         name,
         brand,
         category, 
         description, 
         price: parseFloat(price),
+        costPrice: parseFloat(costPrice), 
         salePercentage: isOnSale ? parseInt(salePercentage, 10) || 0 : 0,
         tags: tags.split(",").map(t => t.trim()).filter(Boolean),
         isNew,
         isOnSale,
         imageUrl: permanentImageUrl,
-        subImages: uploadedSubImageUrls, // Array containing sub-image urls saved to Firestore
+        subImages: uploadedSubImageUrls,
         variants: variants || [], 
         availableStock: totalStock,
         createdAt: new Date(), 
       };
 
-      const docRef = await addDoc(collection(db, "products"), finalPayload);
-      console.log("Document written with ID: ", docRef.id);
-      
+      await addDoc(collection(db, "products"), finalPayload);
       alert("🎉 Product successfully published to Firestore!");
 
-      // 🧹 Reset Form
       setName("");
       setBrand("");
       setCategory("");
       setDescription("");
       setPrice("");
-      setSalePercentage("");
+      setCostPrice(""); // 👈 Reset added
       setTags("");
       setIsNew(false);
       setIsOnSale(false);
@@ -288,7 +273,7 @@ export default function AdminProductForm() {
       console.error("Error adding document to Firestore: ", error);
       alert("❌ Failed to save product. Check console for details.");
     } finally {
-      setIsPublishing(false); // 🔓 Release lock
+      setIsPublishing(false);
     }
   };
 
@@ -296,7 +281,6 @@ export default function AdminProductForm() {
     <form onSubmit={handleSubmit} className="max-w-xl mx-auto p-6 bg-white shadow-md rounded-lg space-y-6 text-gray-800 text-sm">
       <h2 className="text-xl font-bold border-b pb-2 text-gray-900">📦 Simplified Product Creator</h2>
 
-      {/* 🖼️ Main Image Upload Field */}
       <div className="space-y-2 border-2 border-dashed p-4 rounded-md bg-gray-50 text-center">
         <label className="block font-medium cursor-pointer text-blue-600 hover:underline">
           📷 Click to Upload Main Cover Image
@@ -317,11 +301,10 @@ export default function AdminProductForm() {
         )}
       </div>
 
-      {/* 📸 Sub Images Section (4-6 Alternative angles) */}
       <div className="p-4 border rounded-md bg-slate-50 space-y-3">
         <div>
           <h3 className="font-bold text-gray-900">🖼️ Additional Angle Images (Up to 5)</h3>
-          <p className="text-[11px] text-gray-500 mt-0.5">These display as sub-thumbnails beneath the main cover photo on the details page.</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">These display as sub-thumbnails beneath the main cover photo.</p>
         </div>
 
         <div className="grid grid-cols-5 gap-2">
@@ -343,13 +326,7 @@ export default function AdminProductForm() {
                 <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer text-gray-400 hover:text-blue-500 text-center select-none">
                   <span className="text-xl">+</span>
                   <span className="text-[9px] font-semibold">Angle {index + 1}</span>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    disabled={isPublishing}
-                    onChange={(e) => handleSubImageChange(index, e)} 
-                    className="hidden" 
-                  />
+                  <input type="file" accept="image/*" disabled={isPublishing} onChange={(e) => handleSubImageChange(index, e)} className="hidden" />
                 </label>
               )}
 
@@ -365,7 +342,6 @@ export default function AdminProductForm() {
         </div>
       </div>
 
-      {/* 🏷️ Core Details */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block font-medium">Product Name</label>
@@ -410,21 +386,24 @@ export default function AdminProductForm() {
         </div>
       </div>
 
-      {/* 💰 Price & Sales */}
+      {/* 💰 Price & Sales (Layout unmodified, added costPrice alongside) */}
       <div className="grid grid-cols-2 gap-4 border-t pt-4">
         <div>
-          <label className="block font-medium">Price ($)</label>
+          <label className="block font-medium">Retail Price ($)</label>
           <input type="number" required disabled={isPublishing} value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
         </div>
+        <div>
+          <label className="block font-medium text-purple-700">Cost Price ($) [Admin Only]</label>
+          <input type="number" required disabled={isPublishing} value={costPrice} onChange={e => setCostPrice(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900 border-purple-200 focus:ring-purple-500" placeholder="Wholesale buy value" />
+        </div>
         {isOnSale && (
-          <div>
+          <div className="col-span-2">
             <label className="block font-medium">Discount Percentage (%)</label>
             <input type="number" disabled={isPublishing} value={salePercentage} onChange={e => setSalePercentage(e.target.value)} className="w-full p-2 border rounded mt-1 text-gray-900" />
           </div>
         )}
       </div>
 
-      {/* 🛡️ Status Badges */}
       <div className="flex gap-6 border-y py-3 bg-gray-50 px-4 rounded">
         <label className="flex items-center gap-2 font-medium cursor-pointer">
           <input type="checkbox" disabled={isPublishing} checked={isNew} onChange={e => setIsNew(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
@@ -436,23 +415,14 @@ export default function AdminProductForm() {
         </label>
       </div>
 
-      {/* 📦 Base Stock Input */}
       {variants.length === 0 && (
         <div className="p-4 border rounded bg-slate-50 space-y-2">
           <label className="block font-bold text-gray-900">Base Stock Quantity</label>
           <p className="text-xs text-gray-500">Since no color/size groups are configured, enter the total available stock for this item.</p>
-          <input 
-            type="number" 
-            disabled={isPublishing}
-            placeholder="e.g. 50" 
-            value={baseStock} 
-            onChange={e => setBaseStock(e.target.value)} 
-            className="w-full p-2 border rounded text-gray-900 bg-white" 
-          />
+          <input type="number" disabled={isPublishing} placeholder="e.g. 50" value={baseStock} onChange={e => setBaseStock(e.target.value)} className="w-full p-2 border rounded text-gray-900 bg-white" />
         </div>
       )}
 
-      {/* 🛠️ Simplified Variant Builder */}
       <div className="p-4 border rounded bg-slate-50 space-y-4">
         <h3 className="font-bold text-gray-900">🎨 Step 1: Define Color Group</h3>
         <input type="text" disabled={isPublishing} placeholder="Color Name (e.g., Matte Black)" value={colorName} onChange={e => setColorName(e.target.value)} className="w-full p-2 border rounded text-gray-900 bg-white" />
@@ -480,7 +450,6 @@ export default function AdminProductForm() {
           Save Color Group
         </button>
 
-        {/* Saved Summary list */}
         {variants.length > 0 && (
           <div className="mt-2 space-y-1">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Currently Configured Variants:</span>
@@ -494,7 +463,6 @@ export default function AdminProductForm() {
         )}
       </div>
 
-      {/* 🚀 Submit Button */}
       <button 
         type="submit" 
         disabled={isPublishing}

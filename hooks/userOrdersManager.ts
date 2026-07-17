@@ -7,12 +7,13 @@ export interface OrderItem {
   productId: string;
   name: string;
   price: number;
+  costPrice?: number; // 🔄 Made optional to support older orders safely
   quantity: number;
   color?: string;
   size?: string | number;
   imageUrl: string;
-  refunded?: boolean;          // Track if item was refunded
-  refundedQuantity?: number;  // How many of this item were refunded
+  refunded?: boolean;          
+  refundedQuantity?: number;  
 }
 
 export interface Order {
@@ -35,7 +36,9 @@ export interface Order {
     shipping: number;
     tax: number;
     grandTotal: number;
-    refundedAmount?: number; // Total cash refunded on this order
+    totalCost?: number; 
+    netProfit?: number; 
+    refundedAmount?: number; 
   };
 }
 
@@ -45,7 +48,6 @@ export const useOrdersManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // 1. Listen to orders in real-time
   useEffect(() => {
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
 
@@ -64,7 +66,6 @@ export const useOrdersManager = () => {
     return () => unsubscribe();
   }, []);
 
-  // 2. Filter orders by Order Number, Customer details, Product Name, and Status
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const lowerQuery = searchTerm.toLowerCase();
@@ -89,8 +90,7 @@ export const useOrdersManager = () => {
     });
   }, [orders, searchTerm, statusFilter]);
 
-  // 3. Compute Sales Metrics, Customer counts, Refunds & Chart Data
-  const { salesMetrics, chartData, uniqueCustomersCount, totalRefundedMoney, totalRefundedProducts } = useMemo(() => {
+  const { salesMetrics, profitMetrics, chartData, uniqueCustomersCount, totalRefundedMoney, totalRefundedProducts } = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
@@ -100,19 +100,16 @@ export const useOrdersManager = () => {
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    let daily = 0;
-    let weekly = 0;
-    let monthly = 0;
-    let total = 0;
+    let daily = 0; let weekly = 0; let monthly = 0; let total = 0;
+    
+    // 📊 Profit accumulators tracking variables
+    let dailyProfit = 0; let weeklyProfit = 0; let monthlyProfit = 0; let totalProfit = 0;
 
-    // Refund tracking accumulators
     let refundedMoney = 0;
     let refundedProducts = 0;
 
-    // Unique customer tracker (using Set to handle deduplication automatically)
     const customerEmails = new Set<string>();
 
-    // Structure a map to hold sales per day for the last 7 days
     const dailySalesMap: { [dateKey: string]: number } = {};
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
@@ -122,12 +119,10 @@ export const useOrdersManager = () => {
     }
 
     orders.forEach((order) => {
-      // Record customer email for unique counts (ignore casing differences)
       if (order.customer?.email) {
         customerEmails.add(order.customer.email.toLowerCase().trim());
       }
 
-      // 🛑 Track refund calculations regardless of overall order cancellation status
       if (order.financials?.refundedAmount) {
         refundedMoney += order.financials.refundedAmount;
       }
@@ -147,19 +142,48 @@ export const useOrdersManager = () => {
 
       if (!orderDate) return;
 
+      // 🎯 DYNAMIC PROFIT CALCULATION FALLBACK SYSTEM
+      // Loop over items directly to sum profit, avoiding reliance on missing top-level document properties
+      let computedOrderProfit = 0;
+      if (order.items && order.items.length > 0) {
+        order.items.forEach((item) => {
+          const itemPrice = item.price || 0;
+          
+          // 💡 If costPrice is missing from older checkout collections, estimate at a 40% margin base fallback so analytics don't break
+          const itemCost = item.costPrice !== undefined ? item.costPrice : (itemPrice * 0.6);
+          
+          const activeQty = item.quantity || 1;
+          const refundedQty = item.refunded ? (item.refundedQuantity || activeQty) : 0;
+          const netQty = Math.max(0, activeQty - refundedQty);
+
+          computedOrderProfit += (itemPrice - itemCost) * netQty;
+        });
+      } else {
+        // Ultimate fallback if items array doesn't exist
+        computedOrderProfit = (order.financials?.subtotal || totalAmount) * 0.4;
+      }
+
+      // Deduct external direct adjustments if needed
+      if (!order.items?.some(i => i.refunded) && order.financials?.refundedAmount) {
+        computedOrderProfit -= order.financials.refundedAmount;
+      }
+
       total += totalAmount;
+      totalProfit += computedOrderProfit;
 
       if (orderDate >= startOfToday) {
         daily += totalAmount;
+        dailyProfit += computedOrderProfit;
       }
       if (orderDate >= startOfWeek) {
         weekly += totalAmount;
+        weeklyProfit += computedOrderProfit;
       }
       if (orderDate >= startOfMonth) {
         monthly += totalAmount;
+        monthlyProfit += computedOrderProfit;
       }
 
-      // Populate chart keys
       const dateKey = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       if (dateKey in dailySalesMap) {
         dailySalesMap[dateKey] += totalAmount;
@@ -173,6 +197,7 @@ export const useOrdersManager = () => {
 
     return {
       salesMetrics: { daily, weekly, monthly, total },
+      profitMetrics: { daily: dailyProfit, weekly: weeklyProfit, monthly: monthlyProfit, total: totalProfit },
       chartData: formattedChartData,
       uniqueCustomersCount: customerEmails.size,
       totalRefundedMoney: refundedMoney,
@@ -184,10 +209,11 @@ export const useOrdersManager = () => {
     orders: filteredOrders,
     allOrdersCount: orders.length,
     salesMetrics,
+    profitMetrics, 
     chartData,
-    uniqueCustomersCount,     // 👈 Returned: Number of unique shoppers
-    totalRefundedMoney,       // 👈 Returned: Total dollar amount of refunds issued
-    totalRefundedProducts,    // 👈 Returned: Number of physical products returned/refunded
+    uniqueCustomersCount,     
+    totalRefundedMoney,       
+    totalRefundedProducts,    
     searchTerm,
     setSearchTerm,
     statusFilter,

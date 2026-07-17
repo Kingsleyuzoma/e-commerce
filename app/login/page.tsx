@@ -2,15 +2,16 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "@/config/firebase"; // Adjust this path based on your project structure
-import { useAuth } from "@/Context/AuthContext"; // Adjust this path based on your project structure
+import { auth, googleProvider } from "@/config/firebase"; 
+import { useAuth } from "@/Context/AuthContext"; 
 import { FcGoogle } from "react-icons/fc";
 import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   
   const [formData, setFormData] = useState({
@@ -18,9 +19,20 @@ export default function LoginPage() {
     password: "",
   });
   
-  // 🚨 Add a state variable to track submission errors
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Helper function to set the middleware authorization cookie
+  const setAuthCookie = () => {
+    document.cookie = "user_session=authenticated_true; path=/; max-age=86400; SameSite=Strict";
+  };
+
+  // Helper function to handle routing after successful authentication
+  const handleRedirect = () => {
+    const redirectTo = searchParams.get("redirect") || "/";
+    router.push(redirectTo);
+    router.refresh(); // Tells Next.js to immediately re-evaluate the middleware state
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -28,27 +40,34 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);    // Reset errors before trying
-    setLoading(true);  // Turn on loading state
+    setError(null);    
+    setLoading(true);  
     
     try {
-      // 🔑 Pass the actual email and password to our Firebase context function
       await login(formData.email, formData.password);
       
-      // 🗺️ Redirect on successful login
-      router.push("/"); 
+      // 🍪 Set the secure session cookie for Next middleware tracking
+      setAuthCookie();
+      
+      // 🗺️ Redirect to intended target destination
+      handleRedirect();
     } catch (err: any) {
-      // 📑 Extract the Firebase error message or use a generic one
       setError(err.message || "Failed to sign in. Please check your credentials.");
     } finally {
-      setLoading(false); // Turn off loading state
+      setLoading(false); 
     }
   };
 
   const handleGoogleLogin = async () => {
+    setError(null);
     try {
       await signInWithPopup(auth, googleProvider);
-      router.push("/");
+      
+      // 🍪 Set the secure session cookie for Next middleware tracking
+      setAuthCookie();
+      
+      // 🗺️ Redirect to intended target destination
+      handleRedirect();
     } catch (error) {
       console.error("Google login failed:", error);
       setError("Failed to sign in with Google.");
@@ -63,21 +82,7 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-gray-600">Please sign in to your account</p>
         </div>
         
-        <div className="flex items-center justify-between mb-2">
-  <label className="block text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-    Password
-  </label>
-  <Link
-    href="/forgot-password"
-    className="text-[11px] font-bold text-gray-400 hover:text-gray-950 transition-colors"
-  >
-    Forgot password?
-  </Link>
-</div>
-
-
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {/* ⚠️ Error Banner Section */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl text-center">
               {error}
@@ -100,7 +105,17 @@ export default function LoginPage() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-[11px] font-bold text-gray-400 hover:text-gray-950 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 type="password"
                 name="password"
