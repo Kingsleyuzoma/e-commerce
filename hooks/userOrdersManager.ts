@@ -1,8 +1,8 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 
-// 💡 Defined directly in this file to prevent import path/types module errors
 export interface OrderItem {
   productId: string;
   name: string;
@@ -11,6 +11,8 @@ export interface OrderItem {
   color?: string;
   size?: string | number;
   imageUrl: string;
+  refunded?: boolean;          // Track if item was refunded
+  refundedQuantity?: number;  // How many of this item were refunded
 }
 
 export interface Order {
@@ -33,6 +35,7 @@ export interface Order {
     shipping: number;
     tax: number;
     grandTotal: number;
+    refundedAmount?: number; // Total cash refunded on this order
   };
 }
 
@@ -86,8 +89,8 @@ export const useOrdersManager = () => {
     });
   }, [orders, searchTerm, statusFilter]);
 
-  // 3. Compute Sales Metrics & Chart Data (7-day trend)
-  const { salesMetrics, chartData } = useMemo(() => {
+  // 3. Compute Sales Metrics, Customer counts, Refunds & Chart Data
+  const { salesMetrics, chartData, uniqueCustomersCount, totalRefundedMoney, totalRefundedProducts } = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
@@ -102,6 +105,13 @@ export const useOrdersManager = () => {
     let monthly = 0;
     let total = 0;
 
+    // Refund tracking accumulators
+    let refundedMoney = 0;
+    let refundedProducts = 0;
+
+    // Unique customer tracker (using Set to handle deduplication automatically)
+    const customerEmails = new Set<string>();
+
     // Structure a map to hold sales per day for the last 7 days
     const dailySalesMap: { [dateKey: string]: number } = {};
     for (let i = 6; i >= 0; i--) {
@@ -112,6 +122,24 @@ export const useOrdersManager = () => {
     }
 
     orders.forEach((order) => {
+      // Record customer email for unique counts (ignore casing differences)
+      if (order.customer?.email) {
+        customerEmails.add(order.customer.email.toLowerCase().trim());
+      }
+
+      // 🛑 Track refund calculations regardless of overall order cancellation status
+      if (order.financials?.refundedAmount) {
+        refundedMoney += order.financials.refundedAmount;
+      }
+
+      if (order.items) {
+        order.items.forEach((item) => {
+          if (item.refunded) {
+            refundedProducts += item.refundedQuantity || item.quantity;
+          }
+        });
+      }
+
       if (order.status === 'cancelled') return;
 
       const totalAmount = order.financials?.grandTotal || 0;
@@ -146,6 +174,9 @@ export const useOrdersManager = () => {
     return {
       salesMetrics: { daily, weekly, monthly, total },
       chartData: formattedChartData,
+      uniqueCustomersCount: customerEmails.size,
+      totalRefundedMoney: refundedMoney,
+      totalRefundedProducts: refundedProducts,
     };
   }, [orders]);
 
@@ -153,7 +184,10 @@ export const useOrdersManager = () => {
     orders: filteredOrders,
     allOrdersCount: orders.length,
     salesMetrics,
-    chartData, // 📈 Safely returned to feed the dashboard chart
+    chartData,
+    uniqueCustomersCount,     // 👈 Returned: Number of unique shoppers
+    totalRefundedMoney,       // 👈 Returned: Total dollar amount of refunds issued
+    totalRefundedProducts,    // 👈 Returned: Number of physical products returned/refunded
     searchTerm,
     setSearchTerm,
     statusFilter,

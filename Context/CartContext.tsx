@@ -2,11 +2,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-// 📡 Bring in Firestore functions and your database configuration
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/config/firebase"; 
 
-// 📦 Explicitly matching the deep variant structure from your data layer
 export interface SizeVariant {
   size: string | number;
   stock: number;
@@ -32,7 +30,6 @@ export interface Product {
   tags?: string[];
 }
 
-// 🛒 Expanded to store specific selection variants natively
 export interface CartItem {
   product: Product;
   quantity: number;
@@ -52,6 +49,7 @@ interface CartContextType {
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
   getTotalPrice: () => number;
+  triggerToast: (message: string) => void; // 👈 Expose toast control
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -61,6 +59,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoaded, setIsLoaded] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+
+  // 🔔 Toast Notification State
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 📥 Fetch live products from Firestore
   useEffect(() => {
@@ -85,11 +88,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Left intact for your processing logic
   };
 
-  // 🔔 Toast Notification State
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   // 📥 Load cart from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -112,40 +110,47 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cart, isLoaded]);
 
+  // 📢 Trigger custom toast messages dynamically
+  const triggerToast = (message: string) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToastMessage(message);
+    setShowToast(true);
 
+    toastTimeoutRef.current = setTimeout(() => {
+      setShowToast(false);
+    }, 3000);
+  };
 
-  // 🛠️ Add items as CartItem objects and compare by product/variant key:
-const addToCart = (incomingItem: CartItem) => {
-  const incomingKey = `${incomingItem.product.id}-${incomingItem.selectedColor || ''}-${incomingItem.selectedSize || ''}`;
+  // 🛠️ Add items as CartItem objects
+  const addToCart = (incomingItem: CartItem) => {
+    const incomingKey = `${incomingItem.product.id}-${incomingItem.selectedColor || ''}-${incomingItem.selectedSize || ''}`;
 
-  setCart((prevCart) => {
-    const existingItemIndex = prevCart.findIndex((item) => {
-      const itemKey = `${item.product.id}-${item.selectedColor || ''}-${item.selectedSize || ''}`;
-      return itemKey === incomingKey;
+    setCart((prevCart) => {
+      const existingItemIndex = prevCart.findIndex((item) => {
+        const itemKey = `${item.product.id}-${item.selectedColor || ''}-${item.selectedSize || ''}`;
+        return itemKey === incomingKey;
+      });
+
+      if (existingItemIndex > -1) {
+        const updatedCart = [...prevCart];
+        updatedCart[existingItemIndex] = {
+          ...updatedCart[existingItemIndex],
+          quantity: updatedCart[existingItemIndex].quantity + incomingItem.quantity,
+        };
+        return updatedCart;
+      }
+
+      return [...prevCart, incomingItem];
     });
 
-    if (existingItemIndex > -1) {
-      const updatedCart = [...prevCart];
-      updatedCart[existingItemIndex] = {
-        ...updatedCart[existingItemIndex],
-        quantity: updatedCart[existingItemIndex].quantity + incomingItem.quantity,
-      };
-      return updatedCart;
-    }
+    // 🔔 Fire notification when added successfully!
+    triggerToast(`Added ${incomingItem.product.name} to your cart! 🛍️`);
+  };
 
-    return [...prevCart, incomingItem];
-  });
-};
-
-
-
-
-
-
-
-  // 🗑️ Uses a compound unique filter mapping rather than strict raw IDs 
+  // 🗑️ Remove items
   const removeFromCart = (cartItemId: string) => {
-    // cartItemId should format out to `${product.id}-${selectedColor}-${selectedSize}`
     setCart((prevCart) => prevCart.filter(item => {
       const uniqueKey = `${item.product.id}-${item.selectedColor || ''}-${item.selectedSize || ''}`;
       return uniqueKey !== cartItemId;
@@ -194,6 +199,13 @@ const addToCart = (incomingItem: CartItem) => {
     }, 0);
   };
 
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
+
   return (
     <CartContext.Provider value={{ 
       cart, 
@@ -206,7 +218,8 @@ const addToCart = (incomingItem: CartItem) => {
       getCartCount, 
       getTotalPrice, 
       isCartOpen, 
-      setIsCartOpen
+      setIsCartOpen,
+      triggerToast
     }}>
       {children}
 

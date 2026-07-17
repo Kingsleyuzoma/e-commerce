@@ -5,6 +5,7 @@ import Navbar from "@/Components/shop/Navbar";
 import { CartProvider } from "@/Context/CartContext";
 import CartDrawer from "@/Components/shop/CartDrawer";
 import { AuthProvider } from "@/Context/AuthContext";
+import Footer from '@/Components/shop/Footer'
 
 
 const geistSans = Geist({
@@ -41,6 +42,7 @@ export default function RootLayout({
         <CartDrawer />
       </CartProvider>
       </AuthProvider>
+      <Footer />
       </body>
     </html>
   );

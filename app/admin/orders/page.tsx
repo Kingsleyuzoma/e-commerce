@@ -4,9 +4,11 @@
 import React, { useState } from "react";
 import { useOrdersManager } from "@/hooks/userOrdersManager";
 import { updateOrderStatus, deleteOrder } from "@/utils/admin";
-import { Order } from "@/hooks/userOrdersManager";
+import { Order, OrderItem } from "@/hooks/userOrdersManager";
 import Link from "next/link";
-import { downloadOrderReceipt } from "@/utils/receiptGenerator"; // 👈 Imported the receipt downloader
+import { downloadOrderReceipt } from "@/utils/receiptGenerator";
+import { db } from "@/config/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 import {
   AreaChart,
   Area,
@@ -21,7 +23,10 @@ export default function AdminOrdersPage() {
   const { 
     orders, 
     salesMetrics, 
-    chartData, // 📈 Grab the chart data from the custom hook
+    chartData, 
+    uniqueCustomersCount,
+    totalRefundedMoney,
+    totalRefundedProducts,
     searchTerm, 
     setSearchTerm, 
     statusFilter, 
@@ -30,6 +35,9 @@ export default function AdminOrdersPage() {
   } = useOrdersManager();
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showRefundPanel, setShowRefundPanel] = useState(false);
+  const [refundAmount, setRefundAmount] = useState<string>("");
+  const [refundedItemsState, setRefundedItemsState] = useState<{ [productId: string]: boolean }>({});
 
   // Handle Order Actions
   const handleStatusChange = async (orderId: string, newStatus: string) => {
@@ -55,9 +63,80 @@ export default function AdminOrdersPage() {
     }
   };
 
+  // 💸 Process Refund in Firestore
+  const handleIssueRefund = async () => {
+    if (!selectedOrder) return;
+
+    const parsedRefundAmount = parseFloat(refundAmount) || 0;
+    if (parsedRefundAmount < 0) {
+      alert("Refund amount cannot be negative.");
+      return;
+    }
+
+    const currentRefundedAmount = selectedOrder.financials.refundedAmount || 0;
+    const newRefundedAmount = currentRefundedAmount + parsedRefundAmount;
+
+    if (newRefundedAmount > selectedOrder.financials.grandTotal) {
+      alert("Total refunds cannot exceed the grand total value of the order.");
+      return;
+    }
+
+    try {
+      // Map across item objects toggling status
+      const updatedItems = selectedOrder.items.map((item) => {
+        const isSelectedForRefund = refundedItemsState[item.productId];
+        if (isSelectedForRefund) {
+          return {
+            ...item,
+            refunded: true,
+            refundedQuantity: item.quantity, // Default to full quantity refund
+          };
+        }
+        return item;
+      });
+
+      const orderRef = doc(db, "orders", selectedOrder.id);
+      
+      const updatePayload = {
+        items: updatedItems,
+        "financials.refundedAmount": newRefundedAmount,
+      };
+
+      await updateDoc(orderRef, updatePayload);
+
+      // Locally update currently viewed state structure
+      setSelectedOrder((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          items: updatedItems,
+          financials: {
+            ...prev.financials,
+            refundedAmount: newRefundedAmount,
+          },
+        };
+      });
+
+      // Clear input values
+      setRefundAmount("");
+      setRefundedItemsState({});
+      setShowRefundPanel(false);
+      alert("Refund issued and database synced successfully!");
+    } catch (error) {
+      console.error("Error processing refund:", error);
+      alert("Failed to record refund transaction.");
+    }
+  };
+
+  const toggleItemRefundSelection = (productId: string) => {
+    setRefundedItemsState((prev) => ({
+      ...prev,
+      [productId]: !prev[productId],
+    }));
+  };
+
   // Helper to trigger the PDF dynamic receipt generation on demand
   const handleDownloadReceipt = (order: Order) => {
-    // Mapping keys to match structural receipt parameters
     const mappedCustomer = {
       fullName: order.customer.fullName,
       email: order.customer.email,
@@ -73,7 +152,7 @@ export default function AdminOrdersPage() {
       product: {
         name: item.name,
         price: item.price,
-        salePrice: null, // base values parsed inside the document
+        salePrice: null,
       },
       quantity: item.quantity,
       selectedColor: item.color || "",
@@ -137,16 +216,30 @@ export default function AdminOrdersPage() {
               <p className="text-lg md:text-2xl font-black text-emerald-600 mt-2">${salesMetrics.daily.toFixed(2)}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">This Week</p>
-              <p className="text-lg md:text-2xl font-black text-blue-600 mt-2">${salesMetrics.weekly.toFixed(2)}</p>
-            </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">This Month</p>
               <p className="text-lg md:text-2xl font-black text-purple-600 mt-2">${salesMetrics.monthly.toFixed(2)}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Revenue</p>
               <p className="text-lg md:text-2xl font-black text-gray-950 mt-2">${salesMetrics.total.toFixed(2)}</p>
+            </div>
+            
+            {/* 👥 Unique Customers Card */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Customers</p>
+              <p className="text-lg md:text-2xl font-black text-blue-600 mt-2">{uniqueCustomersCount}</p>
+            </div>
+
+            {/* 💸 Total Refunded Money Card */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Refunded Cash</p>
+              <p className="text-lg md:text-2xl font-black text-rose-600 mt-2">${totalRefundedMoney.toFixed(2)}</p>
+            </div>
+
+            {/* 📦 Total Refunded Products Card */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Refunded Items</p>
+              <p className="text-lg md:text-2xl font-black text-amber-600 mt-2">{totalRefundedProducts} items</p>
             </div>
           </div>
 
@@ -222,7 +315,12 @@ export default function AdminOrdersPage() {
                 {orders.map((order) => (
                   <div
                     key={order.id}
-                    onClick={() => setSelectedOrder(order)}
+                    onClick={() => {
+                      setSelectedOrder(order);
+                      setShowRefundPanel(false);
+                      setRefundAmount("");
+                      setRefundedItemsState({});
+                    }}
                     className={`p-4 transition-colors cursor-pointer hover:bg-gray-50 flex items-center justify-between gap-4 ${
                       selectedOrder?.id === order.id ? "bg-gray-50/70 border-l-4 border-gray-900" : ""
                     }`}
@@ -295,7 +393,20 @@ export default function AdminOrdersPage() {
 
                 {/* Customer Information */}
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2 border border-gray-50">
-                  <h3 className="text-xs font-bold text-gray-950 uppercase tracking-wider">Shipping Details</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xs font-bold text-gray-950 uppercase tracking-wider">Shipping Details</h3>
+                    {/* Refund Actions Panel Trigger */}
+                    <button
+                      onClick={() => setShowRefundPanel(!showRefundPanel)}
+                      className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
+                        showRefundPanel 
+                          ? "bg-gray-200 text-gray-800 hover:bg-gray-350"
+                          : "bg-rose-50 text-rose-600 hover:bg-rose-100"
+                      }`}
+                    >
+                      {showRefundPanel ? "Cancel" : "Process Refund"}
+                    </button>
+                  </div>
                   <div className="text-xs text-gray-600 space-y-1 pt-1">
                     <p className="text-gray-900 font-bold">{selectedOrder.customer.fullName}</p>
                     <p>{selectedOrder.customer.address}</p>
@@ -305,15 +416,77 @@ export default function AdminOrdersPage() {
                   </div>
                 </div>
 
+                {/* 💸 Process Refund Interactive Panel */}
+                {showRefundPanel && (
+                  <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4 space-y-3 transition-all duration-200">
+                    <h3 className="text-xs font-bold text-rose-950 uppercase tracking-wider">Process Refund</h3>
+                    
+                    {/* Step 1: Check Items to Refund */}
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] text-rose-800 font-bold">Select items returned/refunded:</p>
+                      {selectedOrder.items.map((item) => (
+                        <label 
+                          key={item.productId} 
+                          className="flex items-center gap-2 text-xs text-gray-700 bg-white p-2 rounded-lg border border-gray-150 cursor-pointer hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!refundedItemsState[item.productId] || !!item.refunded}
+                            disabled={!!item.refunded}
+                            onChange={() => toggleItemRefundSelection(item.productId)}
+                            className="rounded text-rose-600 focus:ring-rose-500 accent-rose-600 h-3.5 w-3.5"
+                          />
+                          <span className="flex-1 truncate font-medium">
+                            {item.name} {item.refunded && <span className="text-[9px] text-rose-600 font-bold">(Already Refunded)</span>}
+                          </span>
+                          <span className="font-bold text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* Step 2: Refund Amount Input */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] text-rose-800 font-bold">Amount to Credit back ($):</label>
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-rose-500"
+                      />
+                    </div>
+
+                    {/* Step 3: Action Buttons */}
+                    <button
+                      onClick={handleIssueRefund}
+                      className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-3 rounded-lg text-xs transition-colors cursor-pointer flex justify-center items-center gap-1"
+                    >
+                      Confirm Refund
+                    </button>
+                  </div>
+                )}
+
                 {/* Product Items Purchased */}
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-gray-950 uppercase tracking-wider">Line Items</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {selectedOrder.items.map((item, index) => (
                       <div key={index} className="flex gap-3 items-center border-b border-gray-50 pb-2 last:border-0">
-                        <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-cover rounded-lg border bg-gray-50" />
+                        <div className="relative">
+                          <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-cover rounded-lg border bg-gray-50" />
+                          {item.refunded && (
+                            <span className="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 text-[8px] leading-none font-bold" title="Refunded">
+                              ↩
+                            </span>
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-950 truncate">{item.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-bold text-gray-950 truncate">{item.name}</p>
+                            {item.refunded && (
+                              <span className="bg-rose-50 text-rose-600 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">Refunded</span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-gray-400 font-medium">
                             {item.color && `Color: ${item.color}`} {item.size && ` | Size: ${item.size}`}
                           </p>
@@ -341,6 +514,14 @@ export default function AdminOrdersPage() {
                     <span className="text-gray-400">Tax</span>
                     <span className="font-medium text-gray-700">${selectedOrder.financials.tax.toFixed(2)}</span>
                   </div>
+                  
+                  {/* Total Refund Value Row */}
+                  {(selectedOrder.financials.refundedAmount || 0) > 0 && (
+                    <div className="flex justify-between text-rose-600 font-bold bg-rose-50/50 p-2 rounded-lg border border-rose-100/50">
+                      <span>Amount Refunded</span>
+                      <span>-${selectedOrder.financials.refundedAmount?.toFixed(2)}</span>
+                    </div>
+                  )}
                   
                   {/* Row Containing Grand Total and Download Button */}
                   <div className="flex justify-between items-center border-t border-gray-50 pt-3">
