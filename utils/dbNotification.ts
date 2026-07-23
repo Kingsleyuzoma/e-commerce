@@ -7,10 +7,11 @@ import {
   onSnapshot, 
   doc, 
   updateDoc, 
+  deleteDoc,
   writeBatch,
   limit 
 } from "firebase/firestore";
-import { db } from "@/config/firebase"; // Ensure this matches your path to initialized firestore database
+import { db } from "@/config/firebase";
 
 export interface DBNotification {
   id: string;
@@ -94,5 +95,35 @@ export const markAllNotificationsAsRead = async (notifications: DBNotification[]
     await batch.commit();
   } catch (error) {
     console.error("Failed to mark all notifications as read:", error);
+  }
+};
+
+/**
+ * 🗑️ Deletes a single notification from Firestore.
+ */
+export const deleteNotification = async (notificationId: string) => {
+  try {
+    const docRef = doc(db, "notifications", notificationId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error("Failed to delete notification:", error);
+    throw error;
+  }
+};
+
+/**
+ * 🧹 Deletes all provided notifications in a single batch.
+ */
+export const clearAllNotifications = async (notifications: DBNotification[]) => {
+  try {
+    const batch = writeBatch(db);
+    notifications.forEach((notif) => {
+      const ref = doc(db, "notifications", notif.id);
+      batch.delete(ref);
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Failed to clear all notifications:", error);
+    throw error;
   }
 };

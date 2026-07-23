@@ -1,10 +1,8 @@
-
 "use client";
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-// Swapped doc/getDoc for collection query imports
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useCart } from "@/Context/CartContext";
@@ -23,11 +21,12 @@ interface ColorVariant {
 interface Product {
   id: string;
   name: string;
+  slug: string;
   brand: string;
   category: string;
   description: string;
   imageUrl: string;
-  subImages?: string[]; // Added: support for 4 to 6 alternative perspective angles
+  subImages?: string[];
   price: number;
   salePercentage: number;
   isNew: boolean;
@@ -37,58 +36,50 @@ interface Product {
   variants: ColorVariant[];
 }
 
-// ================= PAGE PROPS =================
 interface PageProps {
   params: Promise<{
     slug: string;
   }>;
 }
 
-// ================= PAGE =================
 export default function ProductDetailsPage(props: PageProps) {
   const params = use(props.params);
-  const slug = params.slug;
+  const slugParam = params.slug;
   const router = useRouter();
   const { addToCart } = useCart();
 
-  // ================= STATES =================
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState<string | number>("");
   const [quantity, setQuantity] = useState(1);
-  const [activeImage, setActiveImage] = useState(""); // Track selected gallery photo
+  const [activeImage, setActiveImage] = useState("");
 
-  // ================= FETCH PRODUCT =================
+  // ================= FETCH PRODUCT BY SEO SLUG ONLY =================
   useEffect(() => {
     const fetchProduct = async () => {
+      setLoading(true);
       try {
         const productsRef = collection(db, "products");
+        const cleanSlug = decodeURIComponent(slugParam).trim();
 
-        // Decode the slug to handle spaces/special characters (e.g. "Nike%20Shoes" -> "Nike Shoes")
-        const decodedName = decodeURIComponent(slug);
-
-        console.log("1. WHAT THE URL IS PASSING:", decodedName);
-        const allDocs = await getDocs(productsRef);
-        console.log("2. EXACT NAMES IN FIRESTORE:", allDocs.docs.map(d => d.data().name));
-
-        // Query the products collection where the product "name" field matches the decoded URL slug
-        const q = query(productsRef, where("name", "==", decodedName));
+        // 🔑 Pure SEO Query: Only query by the 'slug' field
+        const q = query(productsRef, where("slug", "==", cleanSlug));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-          // Grab the first matched product document
           const snapshot = querySnapshot.docs[0];
           const data = snapshot.data();
 
           const loadedProduct: Product = {
-            id: snapshot.id, // Keeps your Document ID intact for the cart to function perfectly!
+            id: snapshot.id,
+            slug: data.slug || "",
             name: data.name || "",
             brand: data.brand || "",
             category: data.category || "",
             description: data.description || "",
             imageUrl: data.imageUrl || "",
-            subImages: data.subImages || [], // Load the sub-images array
+            subImages: data.subImages || [],
             price: Number(data.price) || 0,
             salePercentage: Number(data.salePercentage) || 0,
             isNew: Boolean(data.isNew),
@@ -99,46 +90,42 @@ export default function ProductDetailsPage(props: PageProps) {
           };
 
           setProduct(loadedProduct);
-          setActiveImage(loadedProduct.imageUrl); // Initialize main view photo
+          setActiveImage(loadedProduct.imageUrl);
 
-          // Default first option
           if (loadedProduct.variants && loadedProduct.variants.length > 0) {
             const firstVariant = loadedProduct.variants[0];
             setSelectedColor(firstVariant.color);
-
             if (firstVariant.sizes.length > 0) {
               setSelectedSize(firstVariant.sizes[0].size);
             }
           }
         } else {
-          console.log("Product not found matching name:", decodedName);
+          console.log("No product found with SEO slug:", cleanSlug);
           setProduct(null);
         }
       } catch (error) {
-        console.log("Error fetching product", error);
+        console.error("Error fetching product by slug:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (slug) {
+    if (slugParam) {
       fetchProduct();
     }
-  }, [slug]);
+  }, [slugParam]);
 
-  // ================= LOADING =================
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center bg-[#FAF9F6]">
         <p className="flex items-center gap-2 text-sm uppercase tracking-[0.16em] text-[#A8A29E]">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#B23A2E]" />
-          Loading product
+          Loading product...
         </p>
       </div>
     );
   }
 
-  // ================= NOT FOUND =================
   if (!product) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-3 bg-[#FAF9F6] text-center">
@@ -154,27 +141,15 @@ export default function ProductDetailsPage(props: PageProps) {
     );
   }
 
-  // ================= PRICE =================
   const finalPrice = product.isOnSale
     ? product.price - (product.price * product.salePercentage) / 100
     : product.price;
 
-  // ================= SELECTED VARIANT =================
   const hasVariants = product.variants && product.variants.length > 0;
-
-  // Safe checks: Only look up color and size variables if variants exist
-  const activeColor = hasVariants
-    ? product.variants.find((variant) => variant.color === selectedColor)
-    : undefined;
-
-  const activeSize = activeColor
-    ? activeColor.sizes.find((item) => item.size === selectedSize)
-    : undefined;
-
-  // If the product has variants, read the active size stock. Otherwise, read the base stock
+  const activeColor = hasVariants ? product.variants.find((v) => v.color === selectedColor) : undefined;
+  const activeSize = activeColor ? activeColor.sizes.find((s) => s.size === selectedSize) : undefined;
   const currentStock = hasVariants ? (activeSize?.stock || 0) : product.availableStock;
 
-  // ================= CART =================
   const handleAddToCart = () => {
     if (hasVariants && (!selectedColor || !selectedSize)) {
       alert("Please select color and size");
@@ -199,18 +174,12 @@ export default function ProductDetailsPage(props: PageProps) {
     alert("Added to cart");
   };
 
-  // Compile the interactive thumbnail images
-  const allImages = [
-    product.imageUrl,
-    ...(product.subImages || [])
-  ].filter(Boolean);
-
+  const allImages = [product.imageUrl, ...(product.subImages || [])].filter(Boolean);
   const displayImage = activeImage || product.imageUrl;
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#1C1917]">
       <div className="mx-auto max-w-7xl px-4 py-10">
-        {/* Breadcrumb */}
         <div className="mb-8 flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-[#A8A29E]">
           <Link href="/" className="transition-colors hover:text-[#1C1917]">Home</Link>
           <span className="text-[#D6D3CD]">/</span>
@@ -220,18 +189,11 @@ export default function ProductDetailsPage(props: PageProps) {
         </div>
 
         <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
-          {/* IMAGE SECTION with Dynamic Interactive Thumbnails */}
           <div className="flex flex-col gap-3">
-            {/* Main Large Image Display */}
             <div className="overflow-hidden rounded-2xl border border-[#E7E4DC] bg-[#F1EFE8]">
-              <img
-                src={displayImage}
-                alt={product.name}
-                className="h-125 w-full object-cover transition-all duration-300"
-              />
+              <img src={displayImage} alt={product.name} className="h-125 w-full object-cover transition-all duration-300" />
             </div>
 
-            {/* Alternative Angle Thumbnails Container (Appears if alternative sub-images exist) */}
             {allImages.length > 1 && (
               <div className="grid grid-cols-5 gap-2">
                 {allImages.slice(0, 6).map((imgUrl, index) => {
@@ -242,20 +204,12 @@ export default function ProductDetailsPage(props: PageProps) {
                       type="button"
                       onClick={() => setActiveImage(imgUrl)}
                       className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border bg-[#F1EFE8] transition-all ${
-                        isActive
-                          ? "border-[#1C1917] ring-1 ring-[#1C1917]/20"
-                          : "border-[#E7E4DC] hover:border-[#1C1917]/40"
+                        isActive ? "border-[#1C1917] ring-1 ring-[#1C1917]/20" : "border-[#E7E4DC] hover:border-[#1C1917]/40"
                       }`}
                     >
-                      <img
-                        src={imgUrl}
-                        alt={`${product.name} thumbnail ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
+                      <img src={imgUrl} alt={`${product.name} thumbnail ${index + 1}`} className="h-full w-full object-cover" />
                       {imgUrl === product.imageUrl && (
-                        <span className="absolute bottom-0.5 right-0.5 origin-bottom-right scale-75 rounded bg-[#1C1917] px-1 py-px text-[7px] font-bold uppercase tracking-wide text-white">
-                          Cover
-                        </span>
+                        <span className="absolute bottom-0.5 right-0.5 origin-bottom-right scale-75 rounded bg-[#1C1917] px-1 py-px text-[7px] font-bold uppercase tracking-wide text-white">Cover</span>
                       )}
                     </button>
                   );
@@ -264,60 +218,37 @@ export default function ProductDetailsPage(props: PageProps) {
             )}
           </div>
 
-          {/* DETAILS */}
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#B23A2E]">
-              {product.brand}
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#B23A2E]">{product.brand}</p>
+            <h1 className="mt-2 font-serif text-3xl font-medium leading-tight tracking-tight text-[#1C1917]">{product.name}</h1>
 
-            <h1 className="mt-2 font-serif text-3xl font-medium leading-tight tracking-tight text-[#1C1917]">
-              {product.name}
-            </h1>
-
-            {/* Price tag — swing-tag styling, punched hole and all */}
             <div className="relative mt-5 inline-block">
               <span className="pointer-events-none absolute -left-[3px] top-1/2 z-10 h-[7px] w-[7px] -translate-y-1/2 rounded-full border border-[#E7E4DC] bg-[#FAF9F6]" />
               <div className="flex items-center gap-3 rounded-r-md rounded-l-[3px] border border-dashed border-[#D6D3CD] bg-white py-1.5 pl-4 pr-4">
                 {product.isOnSale ? (
                   <>
-                    <span className="font-serif text-2xl font-semibold text-[#B23A2E]">
-                      ${finalPrice.toFixed(2)}
-                    </span>
-                    <span className="text-sm text-[#A8A29E] line-through">
-                      ${product.price}
-                    </span>
+                    <span className="font-serif text-2xl font-semibold text-[#B23A2E]">${finalPrice.toFixed(2)}</span>
+                    <span className="text-sm text-[#A8A29E] line-through">${product.price}</span>
                   </>
                 ) : (
-                  <span className="font-serif text-2xl font-semibold text-[#1C1917]">
-                    ${product.price}
-                  </span>
+                  <span className="font-serif text-2xl font-semibold text-[#1C1917]">${product.price}</span>
                 )}
               </div>
             </div>
 
-            <p className="mt-6 max-w-md text-sm leading-relaxed text-[#78716C]">
-              {product.description}
-            </p>
+            <p className="mt-6 max-w-md text-sm leading-relaxed text-[#78716C]">{product.description}</p>
 
-            {/* TAGS */}
             <div className="mt-5 flex flex-wrap gap-2">
               {product.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-[#F1EFE8] px-3 py-1 text-[11px] font-medium text-[#78716C]"
-                >
-                  #{tag}
-                </span>
+                <span key={tag} className="rounded-full bg-[#F1EFE8] px-3 py-1 text-[11px] font-medium text-[#78716C]">#{tag}</span>
               ))}
             </div>
 
-            {/* COLORS */}
             {hasVariants && (
               <div className="mt-8">
                 <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#A8A29E]">
                   Color <span className="ml-1 normal-case tracking-normal text-[#1C1917]">{selectedColor}</span>
                 </h3>
-
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map((variant) => (
                     <button
@@ -327,15 +258,10 @@ export default function ProductDetailsPage(props: PageProps) {
                         setSelectedSize(variant.sizes[0]?.size);
                       }}
                       className={`flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium capitalize transition-all ${
-                        selectedColor === variant.color
-                          ? "border-[#1C1917] bg-[#1C1917] text-white"
-                          : "border-[#E7E4DC] bg-white text-[#57534E] hover:border-[#1C1917]/40"
+                        selectedColor === variant.color ? "border-[#1C1917] bg-[#1C1917] text-white" : "border-[#E7E4DC] bg-white text-[#57534E] hover:border-[#1C1917]/40"
                       }`}
                     >
-                      <span
-                        className="h-2.5 w-2.5 rounded-full border border-black/10"
-                        style={{ backgroundColor: variant.color.toLowerCase() }}
-                      />
+                      <span className="h-2.5 w-2.5 rounded-full border border-black/10" style={{ backgroundColor: variant.color.toLowerCase() }} />
                       {variant.color}
                     </button>
                   ))}
@@ -343,12 +269,9 @@ export default function ProductDetailsPage(props: PageProps) {
               </div>
             )}
 
-            {/* SIZE (only show if variant exists) */}
             {activeColor && activeColor.sizes.length > 0 && (
               <div className="mt-6">
-                <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#A8A29E]">
-                  Size
-                </h3>
+                <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#A8A29E]">Size</h3>
                 <div className="flex flex-wrap gap-2">
                   {activeColor.sizes.map((size) => (
                     <button
@@ -359,9 +282,7 @@ export default function ProductDetailsPage(props: PageProps) {
                         setQuantity(1);
                       }}
                       className={`rounded-lg border px-4 py-2 text-xs font-medium transition-all ${
-                        selectedSize === size.size
-                          ? "border-[#1C1917] bg-[#1C1917] text-white"
-                          : "border-[#E7E4DC] bg-white text-[#1C1917] hover:border-[#1C1917]/40"
+                        selectedSize === size.size ? "border-[#1C1917] bg-[#1C1917] text-white" : "border-[#E7E4DC] bg-white text-[#1C1917] hover:border-[#1C1917]/40"
                       } ${size.stock === 0 ? "cursor-not-allowed opacity-40" : ""}`}
                     >
                       {size.size} <span className="opacity-60">({size.stock})</span>
@@ -371,7 +292,6 @@ export default function ProductDetailsPage(props: PageProps) {
               </div>
             )}
 
-            {/* QUANTITY */}
             <div className="mt-8 flex items-center gap-5 border-t border-dashed border-[#E7E4DC] pt-6">
               <div className="flex items-center overflow-hidden rounded-full border border-[#E7E4DC]">
                 <button
@@ -381,9 +301,7 @@ export default function ProductDetailsPage(props: PageProps) {
                 >
                   −
                 </button>
-
                 <span className="w-8 text-center text-sm font-semibold">{quantity}</span>
-
                 <button
                   disabled={quantity >= currentStock}
                   onClick={() => setQuantity((q) => q + 1)}
@@ -392,7 +310,6 @@ export default function ProductDetailsPage(props: PageProps) {
                   +
                 </button>
               </div>
-
               <span className="text-xs uppercase tracking-[0.1em] text-[#A8A29E]">
                 Stock: <span className="font-semibold text-[#1C1917]">{currentStock}</span>
               </span>

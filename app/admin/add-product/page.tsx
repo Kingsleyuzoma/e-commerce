@@ -212,6 +212,17 @@ export default function AdminProductForm() {
     try {
       setIsPublishing(true);
 
+      // 🔑 1. Generate Clean SEO Unique Slug (e.g., "eye-glasses-7492")
+      const baseSlug = name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9 -]/g, "") // Remove non-alphanumeric chars
+        .replace(/\s+/g, "-")        // Convert spaces to hyphens
+        .replace(/-+/g, "-");       // Deduplicate hyphens
+
+      // Short unique suffix using timestamp snippet
+      const uniqueSlug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
+
       const permanentImageUrl = await uploadProductImage(imageFile, () => {});
 
       const uploadedSubImageUrls: string[] = [];
@@ -226,9 +237,10 @@ export default function AdminProductForm() {
         }
       }
 
-      // 🛠️ Captured costPrice added to backend payload structure safely
+      // 🛠️ Updated payload includes the unique SEO slug
       const finalPayload = {
         name,
+        slug: uniqueSlug, // 👈 ADDED UNIQUE SEO SLUG HERE
         brand,
         category, 
         description, 
@@ -253,7 +265,7 @@ export default function AdminProductForm() {
       setCategory("");
       setDescription("");
       setPrice("");
-      setCostPrice(""); // 👈 Reset added
+      setCostPrice("");
       setTags("");
       setIsNew(false);
       setIsOnSale(false);
@@ -276,6 +288,9 @@ export default function AdminProductForm() {
       setIsPublishing(false);
     }
   };
+
+
+
 
   return (
     <form onSubmit={handleSubmit} className="max-w-xl mx-auto p-6 bg-white shadow-md rounded-lg space-y-6 text-gray-800 text-sm">

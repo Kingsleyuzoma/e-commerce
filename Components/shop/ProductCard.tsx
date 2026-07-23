@@ -17,7 +17,7 @@ interface ColorVariant {
 interface ProductCardProps {
   product: {
     id: string;
-    slug: string;
+    slug?: string;
     name: string;
     brand: string;
     description: string;
@@ -56,6 +56,9 @@ export default function ProductCard({ product }: ProductCardProps) {
   const activeVariant = hasVariants
     ? product.variants.find((v) => v.color === selectedColor)
     : undefined;
+
+  // Safe route param fallback (uses slug first, falls back to name)
+  const productPath = `/products/details/${encodeURIComponent(product.slug || product.name)}`;
 
   const handleColorChange = (color: string) => {
     setSelectedColor(color);
@@ -112,7 +115,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div>
         {/* Product Image */}
         <Link
-          href={`/products/details/${product.name}`}
+          href={productPath}
           className="relative mb-4 block aspect-square w-full cursor-pointer overflow-hidden rounded-2xl border border-[#E7E4DC] bg-[#F1EFE8]"
         >
           <img
@@ -147,7 +150,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Product Name & Description */}
-        <Link href={`/products/details/${product.name}`} className="block cursor-pointer">
+        <Link href={productPath} className="block cursor-pointer">
           <h3 className="mb-1 font-serif text-[1.05rem] font-medium leading-snug tracking-tight text-[#1C1917] line-clamp-1 transition-colors group-hover:text-[#B23A2E]">
             {product.name}
           </h3>
@@ -235,7 +238,6 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Price Row & Action Button */}
         <div className="flex items-center justify-between gap-3 border-t border-dashed border-[#E7E4DC] pt-3">
-          {/* Price tag — styled like a swing tag, punched hole and all */}
           <div className="relative">
             <span className="pointer-events-none absolute -left-[3px] top-1/2 z-10 h-[7px] w-[7px] -translate-y-1/2 rounded-full border border-[#E7E4DC] bg-[#FAF9F6]" />
             <div className="flex flex-col rounded-r-md rounded-l-[3px] border border-dashed border-[#D6D3CD] bg-white py-1 pl-3.5 pr-3">
