@@ -83,9 +83,14 @@ export async function createOrder(
 
   const orderData = {
     orderNumber,
+   
     createdAt: serverTimestamp(),
     status: "pending",
-    customer,
+     customer: {
+      ...customer,
+      email: customer.email.trim().toLocaleLowerCase()
+    },
+    //customer,
     items: formattedItems,
     financials: {
       ...financials,

@@ -42,10 +42,10 @@ export default function Footer() {
           {/* Column 1: Brand & Bio */}
           <div className="lg:col-span-2 space-y-6">
             <Link href="/" className="text-2xl font-extrabold text-white tracking-wide">
-              Femel<span className="text-pink-500">👑</span>
+              THE HORIZON<span className="text-pink-500"></span>
             </Link>
             <p className="text-sm text-gray-400 leading-relaxed max-w-sm">
-              Discover your style with Femel. Curating the finest collections in beauty, premium footwear, and elegant apparel. Elevating your everyday look with modern essentials.
+              Discover your style with THE HORIZON. Curating the finest collections in beauty, premium footwear, and elegant apparel. Elevating your everyday look with modern essentials.
             </p>
             {/* Social Icons */}
             <div className="flex space-x-4">
@@ -120,7 +120,7 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           
           <p className="text-xs text-gray-500 text-center md:text-left">
-            &copy; {new Date().getFullYear()} Femel Inc. All rights reserved. Made with Love.
+            &copy; {new Date().getFullYear()} THE HORIZON Inc. All rights reserved. Made with Love.
           </p>
 
           {/* Payment Badges */}

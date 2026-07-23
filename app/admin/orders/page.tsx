@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -18,6 +17,29 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
+// 🎨 Helper for dynamic order status styling
+const getAdminStatusBadgeStyle = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "confirmed":
+      return "bg-cyan-50 text-cyan-700 border-cyan-200";
+    case "processing":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "shipped":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+    case "delivered":
+      return "bg-teal-50 text-teal-700 border-teal-200";
+    case "completed":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "cancelled":
+      return "bg-rose-50 text-rose-700 border-rose-200";
+    case "refunded":
+      return "bg-purple-50 text-purple-700 border-purple-200";
+    case "pending":
+    default:
+      return "bg-amber-50 text-amber-700 border-amber-200";
+  }
+};
 
 export default function AdminOrdersPage() {
   const { 
@@ -186,6 +208,8 @@ export default function AdminOrdersPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-gray-900 transition-colors w-full sm:w-64"
             />
+
+            {/* 🎯 Filter dropdown with all 8 statuses */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -193,9 +217,13 @@ export default function AdminOrdersPage() {
             >
               <option value="all">All Statuses</option>
               <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
               <option value="processing">Processing</option>
               <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
+              <option value="refunded">Refunded</option>
             </select>
           </div>
         </div>
@@ -295,18 +323,14 @@ export default function AdminOrdersPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-black text-gray-950">{order.orderNumber}</span>
+                        
+                        {/* 🎯 Updated Status Badge Tag */}
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            order.status === "shipped"
-                              ? "bg-green-50 text-green-700"
-                              : order.status === "processing"
-                              ? "bg-blue-50 text-blue-700"
-                              : order.status === "cancelled"
-                              ? "bg-red-50 text-red-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getAdminStatusBadgeStyle(
+                            order.status
+                          )}`}
                         >
-                          {order.status}
+                          {order.status || "pending"}
                         </span>
                       </div>
                       <p className="text-xs font-bold text-gray-900">{order.customer.fullName}</p>
@@ -343,15 +367,21 @@ export default function AdminOrdersPage() {
 
                 <div>
                   <label className="block text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-2">Fulfillment Status</label>
+                  
+                  {/* 🎯 Order Status Selection with all 8 choices */}
                   <select
                     value={selectedOrder.status}
                     onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-gray-950 cursor-pointer"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-gray-950 cursor-pointer font-bold"
                   >
                     <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
                     <option value="processing">Processing</option>
                     <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
+                    <option value="refunded">Refunded</option>
                   </select>
                 </div>
 
@@ -428,7 +458,6 @@ export default function AdminOrdersPage() {
                   <h3 className="text-xs font-bold text-gray-950 uppercase tracking-wider">Line Items</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {selectedOrder.items.map((item, index) => {
-                      // 🎯 FIX: Core dynamic tracking fallback math for old records
                       const itemRetailPrice = item.price || 0;
                       const itemCostPrice = item.costPrice !== undefined ? item.costPrice : (itemRetailPrice * 0.6);
                       const singleItemProfit = itemRetailPrice - itemCostPrice;
@@ -462,7 +491,6 @@ export default function AdminOrdersPage() {
                             </div>
                           </div>
 
-                          {/* 💸 Private Individual Product Profit Display Overlay Tag */}
                           <div className="flex justify-between items-center bg-purple-50/40 text-[10px] font-semibold text-purple-800 rounded-md px-2 py-1 mt-1.5 border border-purple-100/30">
                             <span>Private Tracking Metrics:</span>
                             <span>

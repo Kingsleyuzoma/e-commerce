@@ -74,7 +74,7 @@ export default function HomePage() {
           {/* 👑 Header Section */}
           <header className="text-center space-y-2">
             <h1 className="text-4xl font-extrabold text-gray-950 tracking-tight">
-              Femel Beauty & Apparel 👑
+               Beauty & Apparel 
             </h1>
             <p className="text-gray-600 font-medium">Explore our latest arrivals</p>
           </header>
@@ -104,7 +104,7 @@ export default function HomePage() {
                       </p>
                     </div>
                     
-                    <div className="w-full h-44 my-4 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+                    <div className="w-full h-full my-4 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
                       <img 
                         src={leftCard.imageUrl} 
                         alt={leftCard.title} 
@@ -150,7 +150,7 @@ export default function HomePage() {
                       </p>
                     </div>
                     
-                    <div className="w-full h-44 my-4 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+                    <div className="w-full h-full my-4 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
                       <img 
                         src={rightCard.imageUrl} 
                         alt={rightCard.title} 

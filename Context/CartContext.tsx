@@ -226,7 +226,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       {/* 🔔 Global Toast Visual Element */}
       <div 
-        className={`fixed top-4 right-4 z-[9999] max-w-sm bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-gray-800 flex items-center gap-3 transition-all duration-300 pointer-events-none ${
+        className={`fixed top-4 right-4 z-9999 max-w-sm bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-gray-800 flex items-center gap-3 transition-all duration-300 pointer-events-none ${
           showToast 
             ? "opacity-100 translate-y-0 scale-100" 
             : "opacity-0 -translate-y-4 scale-95"

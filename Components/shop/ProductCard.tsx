@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useCart } from "@/Context/CartContext"; 
+import { useCart } from "@/Context/CartContext";
 
 interface SizeVariant {
   size: string | number;
@@ -28,12 +28,12 @@ interface ProductCardProps {
     imageUrl: string;
     variants: ColorVariant[];
     tags: string[];
-    availableStock: number; 
+    availableStock: number;
   };
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const { addToCart } = useCart(); 
+  const { addToCart } = useCart();
 
   const hasVariants = product.variants && product.variants.length > 0;
 
@@ -53,13 +53,13 @@ export default function ProductCard({ product }: ProductCardProps) {
   const hasSale = product.salePercentage > 0;
   const salePrice = hasSale ? product.price * (1 - product.salePercentage / 100) : product.price;
 
-  const activeVariant = hasVariants 
+  const activeVariant = hasVariants
     ? product.variants.find((v) => v.color === selectedColor)
     : undefined;
 
   const handleColorChange = (color: string) => {
     setSelectedColor(color);
-    setSelectedSize(null); 
+    setSelectedSize(null);
   };
 
   const handleAddToCart = () => {
@@ -108,60 +108,73 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <div className="group relative border border-gray-200 rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-full text-sm text-gray-800">
+    <div className="group relative flex h-full flex-col justify-between overflow-hidden rounded-[22px] border border-[#E7E4DC] bg-[#FAF9F6] p-4 text-[#1C1917] shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-16px_rgba(28,25,23,0.25)]">
       <div>
-        {/* Badges */}
-        <div className="absolute top-6 left-6 z-10 flex flex-col gap-1">
-          {product.isNew && (
-            <span className="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
-              New
-            </span>
-          )}
-          {hasSale && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
-              -{product.salePercentage}%
-            </span>
-          )}
-        </div>
-
         {/* Product Image */}
-        <Link href={`/products/details/${product.name}`} className="block aspect-square w-full bg-gray-100 rounded-lg overflow-hidden relative border border-gray-100 mb-4 cursor-pointer">
+        <Link
+          href={`/products/details/${product.name}`}
+          className="relative mb-4 block aspect-square w-full cursor-pointer overflow-hidden rounded-2xl border border-[#E7E4DC] bg-[#F1EFE8]"
+        >
           <img
             src={product.imageUrl || "/placeholder-image.jpg"}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
           />
+
+          {/* Badges */}
+          <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5">
+            {product.isNew && (
+              <span className="rounded-full border border-[#1C1917]/10 bg-white/85 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1C1917] backdrop-blur-sm">
+                New Arrival
+              </span>
+            )}
+            {hasSale && (
+              <span className="rounded-full bg-[#B23A2E] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white shadow-sm">
+                −{product.salePercentage}% Off
+              </span>
+            )}
+          </div>
         </Link>
 
         {/* Brand & Category */}
-        <div className="flex justify-between items-center text-gray-400 uppercase tracking-wider mb-1">
-          <span>{product.brand}</span>
-          <span className="bg-gray-100 px-2 py-0.5 rounded text-[12px] font-medium tracking-normal normal-case">{product.category}</span>
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#78716C]">
+            {product.brand}
+          </span>
+          <span className="rounded-full bg-[#F1EFE8] px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[#78716C]">
+            {product.category}
+          </span>
         </div>
 
         {/* Product Name & Description */}
         <Link href={`/products/details/${product.name}`} className="block cursor-pointer">
-          <h3 className="font-semibold text-gray-800 text-base line-clamp-1 mb-1 hover:text-gray-600 transition-colors">
+          <h3 className="mb-1 font-serif text-[1.05rem] font-medium leading-snug tracking-tight text-[#1C1917] line-clamp-1 transition-colors group-hover:text-[#B23A2E]">
             {product.name}
           </h3>
         </Link>
-        <p className="text-xs text-gray-500 line-clamp-2 mb-3 h-8">{product.description}</p>
+        <p className="mb-3.5 h-8 text-xs leading-relaxed text-[#78716C] line-clamp-2">
+          {product.description}
+        </p>
 
         {/* Colors Selection */}
         {hasVariants && (
-          <div className="flex flex-wrap gap-1 mb-3 items-center">
-            <span className="text-[11px] text-gray-400 mr-1">Colors:</span>
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-0.5 text-[10px] uppercase tracking-[0.12em] text-[#A8A29E]">Color</span>
             {product.variants.map((v, i) => (
-              <button 
-                key={i} 
+              <button
+                key={i}
                 type="button"
                 onClick={() => handleColorChange(v.color)}
-                className={`text-xs px-2 py-0.5 border rounded font-medium transition-all ${
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize transition-all ${
                   selectedColor === v.color
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                    ? "border-[#1C1917] bg-[#1C1917] text-white"
+                    : "border-[#E7E4DC] bg-white text-[#57534E] hover:border-[#1C1917]/40"
                 }`}
               >
+                <span
+                  className="h-2.5 w-2.5 rounded-full border border-black/10"
+                  style={{ backgroundColor: v.color.toLowerCase() }}
+                />
                 {v.color}
               </button>
             ))}
@@ -170,8 +183,8 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Sizes Display */}
         {activeVariant && activeVariant.sizes.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3 items-center">
-            <span className="text-[11px] text-gray-400 mr-1">Sizes:</span>
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-0.5 text-[10px] uppercase tracking-[0.12em] text-[#A8A29E]">Size</span>
             {activeVariant.sizes.map((s, idx) => {
               const isOutOfStock = s.stock === 0;
               const isSelected = selectedSize === s.size;
@@ -181,15 +194,18 @@ export default function ProductCard({ product }: ProductCardProps) {
                   type="button"
                   disabled={isOutOfStock}
                   onClick={() => setSelectedSize(s.size)}
-                  className={`text-[11px] px-1.5 py-0.5 border rounded font-medium transition-all ${
+                  className={`relative rounded-md border px-2 py-1 text-[11px] font-medium transition-all ${
                     isOutOfStock
-                      ? "bg-gray-100 border-gray-200 text-gray-400 line-through opacity-50 cursor-not-allowed"
+                      ? "cursor-not-allowed border-[#E7E4DC] text-[#D6D3CD] line-through"
                       : isSelected
-                      ? "bg-gray-900 text-white border-gray-900"
-                      : "bg-white border-gray-300 text-gray-800 hover:border-gray-400"
+                      ? "border-[#1C1917] bg-[#1C1917] text-white"
+                      : "border-[#E7E4DC] bg-white text-[#1C1917] hover:border-[#1C1917]/50"
                   }`}
                 >
-                  {s.size} <span className={`text-[9px] ${isSelected ? "text-gray-300" : "text-gray-400"}`}>({s.stock})</span>
+                  {s.size}
+                  <span className={`ml-1 text-[9px] ${isSelected ? "text-white/60" : "text-[#A8A29E]"}`}>
+                    {s.stock}
+                  </span>
                 </button>
               );
             })}
@@ -199,36 +215,54 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       <div>
         {/* Stock Info Status */}
-        <div className="mb-3 text-xs font-medium text-gray-500 flex items-center gap-1.5">
-          <span className={`h-2 w-2 rounded-full ${totalStock > 0 ? "bg-green-500" : "bg-red-500"}`}></span>
+        <div className="mb-3 flex items-center gap-1.5 text-[11px] font-medium text-[#78716C]">
+          <span className="relative flex h-2 w-2">
+            {totalStock > 0 && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#5F7355] opacity-60" />
+            )}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${totalStock > 0 ? "bg-[#5F7355]" : "bg-[#B23A2E]"}`} />
+          </span>
           <span>
-            Total Stock:{" "}
-            <span className={totalStock > 0 ? "text-gray-800 font-semibold" : "text-red-500 font-semibold"}>
-              {totalStock > 0 ? totalStock : "Out of Stock"}
-            </span>
+            {totalStock > 0 ? (
+              <>
+                <span className="font-semibold text-[#1C1917]">{totalStock}</span> in stock
+              </>
+            ) : (
+              <span className="font-semibold text-[#B23A2E]">Out of stock</span>
+            )}
           </span>
         </div>
 
         {/* Price Row & Action Button */}
-        <div className="flex items-center justify-between mt-2 pt-3 border-t border-gray-100">
-          <div className="flex flex-col">
-            {hasSale ? (
-              <>
-                <span className="text-xs text-gray-400 line-through">${product.price.toFixed(2)}</span>
-                <span className="text-lg font-bold text-red-500">${salePrice.toFixed(2)}</span>
-              </>
-            ) : (
-              <span className="text-lg font-bold text-gray-900">${product.price.toFixed(2)}</span>
-            )}
+        <div className="flex items-center justify-between gap-3 border-t border-dashed border-[#E7E4DC] pt-3">
+          {/* Price tag — styled like a swing tag, punched hole and all */}
+          <div className="relative">
+            <span className="pointer-events-none absolute -left-[3px] top-1/2 z-10 h-[7px] w-[7px] -translate-y-1/2 rounded-full border border-[#E7E4DC] bg-[#FAF9F6]" />
+            <div className="flex flex-col rounded-r-md rounded-l-[3px] border border-dashed border-[#D6D3CD] bg-white py-1 pl-3.5 pr-3">
+              {hasSale ? (
+                <>
+                  <span className="text-[10px] leading-none text-[#A8A29E] line-through">
+                    ${product.price.toFixed(2)}
+                  </span>
+                  <span className="font-serif text-lg font-semibold leading-tight text-[#B23A2E]">
+                    ${salePrice.toFixed(2)}
+                  </span>
+                </>
+              ) : (
+                <span className="font-serif text-lg font-semibold leading-tight text-[#1C1917]">
+                  ${product.price.toFixed(2)}
+                </span>
+              )}
+            </div>
           </div>
 
           <button
             type="button"
             disabled={totalStock === 0}
             onClick={handleAddToCart}
-            className="bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer"
+            className="cursor-pointer whitespace-nowrap rounded-full bg-[#1C1917] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#B23A2E] disabled:cursor-not-allowed disabled:bg-[#E7E4DC] disabled:text-[#A8A29E]"
           >
-            Add to Cart
+            Add to Bag
           </button>
         </div>
       </div>

@@ -58,8 +58,8 @@ const Navbar = () => {
         <div className="flex justify-between h-16 items-center">
           
           {/* Logo */}
-          <Link href="/" className="text-xl font-extrabold text-pink-600 tracking-wide">
-            Femel👑
+          <Link href="/" className="text-3xl font-extrabold text-pink-600 tracking-wide">
+            THE HORIZON
           </Link>
 
           {/* Desktop Nav Links */}
