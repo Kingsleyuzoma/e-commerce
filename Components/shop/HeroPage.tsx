@@ -76,7 +76,7 @@ export default function HomePage() {
             <h1 className="text-4xl font-extrabold text-gray-950 tracking-tight">
                Beauty & Apparel 
             </h1>
-            <p className="text-gray-600 font-medium">Explore our latest arrivals</p>
+            <p className="text-gray-600 font-medium">Explore Our Latest Arrivals</p>
           </header>
 
           {/* 🎀 MASTER OVERLAPPING WRAPPER CONTAINER */}

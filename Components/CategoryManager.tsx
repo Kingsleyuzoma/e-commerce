@@ -106,7 +106,7 @@ export default function CategoryManager() {
 
       {/* ➕ Add New Category Form */}
       <form onSubmit={handleAddCategory} className="space-y-2">
-        <label className="block font-medium text-gray-700">New Category Name</label>
+        <label className="block font-medium text-black">New Category Name</label>
         <div className="flex gap-2">
           <input
             type="text"
@@ -129,10 +129,10 @@ export default function CategoryManager() {
 
       {/* 📋 List View of Created Categories */}
       <div className="space-y-2">
-        <h3 className="font-semibold text-gray-900 border-t pt-4">Current Active Categories</h3>
+        <h3 className="font-semibold text-black border-t pt-4">Current Active Categories</h3>
         
         {isLoading ? (
-          <div className="text-xs text-gray-400 animate-pulse py-2">Loading catalog categories...</div>
+          <div className="text-xs text-black animate-pulse py-2">Loading catalog categories...</div>
         ) : categories.length === 0 ? (
           <div className="text-xs italic text-gray-400 bg-gray-50 p-4 text-center rounded border border-dashed">
             No categories created yet. Add one above!
@@ -142,8 +142,8 @@ export default function CategoryManager() {
             {categories.map((cat) => (
               <div key={cat.id} className="flex justify-between items-center p-2.5 bg-white shadow-sm hover:bg-gray-50 text-xs">
                 <div className="flex flex-col">
-                  <span className="font-bold text-gray-800">{cat.name}</span>
-                  <span className="text-[10px] text-gray-400">Slug: {cat.slug}</span>
+                  <span className="font-bold text-black">{cat.name}</span>
+                  <span className="text-[11px] text-black">Slug: {cat.slug}</span>
                 </div>
                 <button
                   type="button"

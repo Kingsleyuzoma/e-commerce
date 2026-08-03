@@ -1,8 +1,8 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useCart } from "@/Context/CartContext"; 
+import { useAuth } from "@/Context/AuthContext"; // 👈 1. Import Auth Context
 import { calculateUSTax, calculateUSShipping } from "@/utils/usTaxShippingCalculator";
 import { SHIPPING_CONFIG } from "@/config/checkoutConfig";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,7 @@ import { triggerOrderNotification, requestNotificationPermission } from "@/utils
 import { createPersistentNotification } from "@/utils/dbNotification";
 
 export default function CheckoutPage() {
+  const { user, loading: authLoading } = useAuth(); // 👈 2. Access auth state
   const { cart, clearCart } = useCart();
   const router = useRouter();
 
@@ -32,6 +33,17 @@ export default function CheckoutPage() {
     state: "", 
     zipCode: "",
   });
+
+  // Prefill email & name if the user is authenticated
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        email: user.email || prev.email,
+        fullName: user.displayName || prev.fullName,
+      }));
+    }
+  }, [user]);
 
   // 🚀 Shipping Method State (Standard is checked/selected by default)
   const [shippingMethod, setShippingMethod] = useState<"standard" | "express">("standard");
@@ -108,7 +120,28 @@ export default function CheckoutPage() {
         }
       );
 
-      // 3. 🔔 Save persistent notification inside Admin Panel Database
+      // 3. 📧 Trigger Order Confirmation Email to Customer
+      try {
+        await fetch("/api/send-order-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            customerName: formData.fullName,
+            orderNumber,
+            items: cart.map((item) => ({
+              title: item.product.name,
+              quantity: item.quantity,
+              price: item.product.salePrice || item.product.price,
+            })),
+            grandTotal,
+          }),
+        });
+      } catch (emailError) {
+        console.error("Order placed, but failed to send confirmation email:", emailError);
+      }
+
+      // 4. 🔔 Save persistent notification inside Admin Panel Database
       await createPersistentNotification(
         "New Order Placed! 🎉",
         `Order #${orderNumber} has been submitted by customer: ${formData.fullName}`,
@@ -116,10 +149,10 @@ export default function CheckoutPage() {
         { orderNumber, grandTotal }
       );
 
-      // 4. 💻 Fire Local Client Browser Native System Notification
+      // 5. 💻 Fire Local Client Browser Native System Notification
       triggerOrderNotification(orderNumber, grandTotal);
 
-      // 5. 📄 Auto-download Invoice PDF receipt 
+      // 6. 📄 Auto-download Invoice PDF receipt 
       downloadOrderReceipt(
         orderNumber,
         { ...formData, shippingMethod },
@@ -127,10 +160,10 @@ export default function CheckoutPage() {
         { subtotal, shipping: shippingCost, tax: taxCost, grandTotal }
       );
 
-      // 6. 🚀 Clear active shopping bag
+      // 7. 🚀 Clear active shopping bag
       clearCart();
 
-      // 7. 🚀 Route to your success screen, passing the Order Number in the URL!
+      // 8. 🚀 Route to your success screen, passing the Order Number in the URL!
       router.push(`/checkout/success?ord=${orderNumber}`);
     } catch (error: any) {
       console.error("Failed to process order:", error);
@@ -140,6 +173,43 @@ export default function CheckoutPage() {
     }
   };
 
+  // 3. ⏳ Handle Auth Loading State
+  if (authLoading) {
+    return (
+      <div className="max-w-md mx-auto text-center py-20 px-4">
+        <p className="text-xs text-gray-400 animate-pulse">Checking authentication status...</p>
+      </div>
+    );
+  }
+
+  // 4. 🔐 Guard: Require User to Log In Before Checkout
+  if (!user) {
+    return (
+      <div className="max-w-md mx-auto text-center py-20 px-4">
+        <span className="text-4xl block mb-4">🔐</span>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Login Required to Checkout</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          Please log in or create an account to complete your order and manage your purchases.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Link
+            href="/login?redirect=/checkout"
+            className="bg-gray-900 text-white text-xs font-semibold px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            Log In
+          </Link>
+          <Link
+            href="/register?redirect=/checkout"
+            className="border border-gray-300 text-gray-700 text-xs font-semibold px-6 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Create Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. 🛒 Check Empty Cart
   if (cart.length === 0) {
     return (
       <div className="max-w-md mx-auto text-center py-20 px-4">
@@ -156,7 +226,6 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-sm text-gray-800">
       <h1 className="text-2xl font-extrabold text-gray-900 mb-8 tracking-tight">Secure Checkout</h1>
-      
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         

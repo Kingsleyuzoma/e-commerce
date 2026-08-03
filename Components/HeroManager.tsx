@@ -277,8 +277,8 @@ export default function HeroManager() {
   return (
     <div className="p-6 max-w-4xl mx-auto bg-gray-50 rounded-2xl shadow-sm space-y-6 text-sm text-gray-800">
       <div>
-        <h2 className="text-2xl font-extrabold text-gray-900">Homepage Asset Manager 🛠️</h2>
-        <p className="text-gray-500 text-sm">Configure your hero banners and surrounding grid content.</p>
+        <h2 className="text-2xl font-extrabold text-gray-900">Hero Asset Manager 🛠️</h2>
+        <p className="text-black text-sm">Configure your hero banners and surrounding grid content.</p>
       </div>
 
       {/* 📑 Tab Navigation Controls */}
@@ -288,7 +288,7 @@ export default function HeroManager() {
           className={`px-4 py-2 font-semibold text-sm rounded-lg transition ${
             activeTab === 'cards' 
               ? 'bg-pink-600 text-white shadow-sm' 
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+              : 'bg-white text-black border border-gray-200 hover:bg-gray-100'
           }`}
         >
            Manage Layout Cards 🎛️
@@ -298,7 +298,7 @@ export default function HeroManager() {
           className={`px-4 py-2 font-semibold text-sm rounded-lg transition ${
             activeTab === 'carousel' 
               ? 'bg-slate-700 text-white shadow-sm' 
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+              : 'bg-white text-black border border-gray-200 hover:bg-gray-100'
           }`}
         >
           Manage Carousel 🎬 
@@ -310,12 +310,12 @@ export default function HeroManager() {
         <div className="space-y-8">
           {/* Create/Edit Layout Card Form */}
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">
+            <h3 className="text-lg font-bold text-black mb-4">
               {editingCardId ? "✏️ Edit Layout Card" : "Create New Home page Card"}
             </h3>
             <form onSubmit={handleCardSubmit} className="space-y-4 max-w-xl">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Card Position</label>
+                <label className="block text-sm font-medium text-black mb-2">Card Position</label>
                 <div className="flex space-x-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
                   <label className="flex items-center space-x-2 cursor-pointer select-none">
                     <input 
@@ -326,7 +326,7 @@ export default function HeroManager() {
                       onChange={() => setCardForm(prev => ({ ...prev, position: 'left' }))}
                       className="text-pink-600 focus:ring-pink-500 h-4 w-4"
                     />
-                    <span className="text-sm font-medium text-gray-700">Left Side (Best Seller) 💎</span>
+                    <span className="text-sm font-medium text-black">Left Side (Best Seller) 💎</span>
                   </label>
                   <label className="flex items-center space-x-2 cursor-pointer select-none">
                     <input 
@@ -337,13 +337,13 @@ export default function HeroManager() {
                       onChange={() => setCardForm(prev => ({ ...prev, position: 'right' }))}
                       className="text-pink-600 focus:ring-pink-500 h-4 w-4"
                     />
-                    <span className="text-sm font-medium text-gray-700">Right Side (Promo Banner) 🏷️</span>
+                    <span className="text-sm font-medium text-black">Right Side (Promo Banner) 🏷️</span>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Card Title</label>
+                <label className="block text-sm font-medium text-black">Card Title</label>
                 <input 
                   type="text" 
                   value={cardForm.title} 
@@ -354,7 +354,7 @@ export default function HeroManager() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
+                <label className="block text-sm font-medium text-black">Description</label>
                 <textarea 
                   value={cardForm.description} 
                   onChange={(e) => setCardForm(prev => ({ ...prev, description: e.target.value }))}
@@ -365,7 +365,7 @@ export default function HeroManager() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Button Text</label>
+                  <label className="block text-sm font-medium text-black">Button Text</label>
                   <input 
                     type="text" 
                     value={cardForm.buttonText} 
@@ -375,7 +375,7 @@ export default function HeroManager() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Button Link URL</label>
+                  <label className="block text-sm font-medium text-black">Button Link URL</label>
                   <input 
                     type="text" 
                     value={cardForm.linkUrl} 
@@ -387,7 +387,7 @@ export default function HeroManager() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-black">
                   Card Display Image {editingCardId && <span className="text-xs text-gray-400 font-normal">(Leave blank to keep existing)</span>}
                 </label>
                 <input 
@@ -439,7 +439,7 @@ export default function HeroManager() {
                           {card.position === 'left' ? 'Left' : 'Right'}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 truncate">{card.description}</p>
+                      <p className="text-xs text-black truncate">{card.description}</p>
                     </div>
                     <div className="flex items-center space-x-1">
                       <button 
@@ -469,7 +469,7 @@ export default function HeroManager() {
         <div className="space-y-8">
           {/* Create/Edit Slide Form */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">
+            <h3 className="text-lg font-bold text-black mb-4">
               {editingSlideId ? "✏️ Edit Hero Slide" : "Create New Hero Slide"}
             </h3>
             <form onSubmit={handleCarouselSubmit} className="space-y-4 max-w-xl">

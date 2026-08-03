@@ -239,7 +239,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Price Row & Action Button */}
         <div className="flex items-center justify-between gap-3 border-t border-dashed border-[#E7E4DC] pt-3">
           <div className="relative">
-            <span className="pointer-events-none absolute -left-[3px] top-1/2 z-10 h-[7px] w-[7px] -translate-y-1/2 rounded-full border border-[#E7E4DC] bg-[#FAF9F6]" />
+            <span className="pointer-events-none absolute -left-0.75 top-1/2 z-10 h-1.75 w-1.75 -translate-y-1/2 rounded-full border border-[#E7E4DC] bg-[#FAF9F6]" />
             <div className="flex flex-col rounded-r-md rounded-l-[3px] border border-dashed border-[#D6D3CD] bg-white py-1 pl-3.5 pr-3">
               {hasSale ? (
                 <>

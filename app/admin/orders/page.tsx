@@ -192,12 +192,12 @@ export default function AdminOrdersPage() {
           <div>
             <Link 
               href="/admin" 
-              className="text-xs text-gray-400 hover:text-gray-950 font-bold mb-2 inline-flex items-center gap-1 transition-colors"
+              className="text-xs text-black hover:text-gray-950 font-bold mb-2 inline-flex items-center gap-1 transition-colors"
             >
               ← Return to Main Dashboard
             </Link>
-            <h1 className="text-2xl font-black text-gray-950 tracking-tight">Orders Management</h1>
-            <p className="text-xs text-gray-400 font-medium mt-1">Monitor real-time sales activity and fulfillments.</p>
+            <h1 className="text-2xl font-black text-black tracking-tight">Orders Management</h1>
+            <p className="text-xs text-black font-medium mt-1">Monitor real-time sales activity and fulfillments.</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -232,41 +232,41 @@ export default function AdminOrdersPage() {
           
           <div className="grid grid-cols-2 gap-4 h-full">
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Today's Sales</p>
+              <p className="text-[10px] text-black font-bold uppercase tracking-wider">Today's Sales</p>
               <p className="text-lg md:text-2xl font-black text-emerald-600 mt-2">${salesMetrics.daily.toFixed(2)}</p>
               <p className="text-[10px] text-emerald-700 font-bold bg-emerald-50/50 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.daily.toFixed(2)}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">This Month</p>
+              <p className="text-[10px] text-black font-bold uppercase tracking-wider">This Month</p>
               <p className="text-lg md:text-2xl font-black text-purple-600 mt-2">${salesMetrics.monthly.toFixed(2)}</p>
               <p className="text-[10px] text-purple-700 font-bold bg-purple-50/50 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.monthly.toFixed(2)}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Revenue</p>
+              <p className="text-[10px] text-black font-bold uppercase tracking-wider">Total Revenue</p>
               <p className="text-lg md:text-2xl font-black text-gray-950 mt-2">${salesMetrics.total.toFixed(2)}</p>
               <p className="text-[10px] text-gray-950 font-bold bg-gray-100 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.total.toFixed(2)}</p>
             </div>
             
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Customers</p>
+              <p className="text-[10px] text-black font-bold uppercase tracking-wider">Customers</p>
               <p className="text-lg md:text-2xl font-black text-blue-600 mt-2">{uniqueCustomersCount}</p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Refunded Cash</p>
+              <p className="text-[10px] text-black font-bold uppercase tracking-wider">Refunded Cash</p>
               <p className="text-lg md:text-2xl font-black text-rose-600 mt-2">${totalRefundedMoney.toFixed(2)}</p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Refunded Items</p>
+              <p className="text-[10px] text-black font-bold uppercase tracking-wider">Refunded Items</p>
               <p className="text-lg md:text-2xl font-black text-amber-600 mt-2">{totalRefundedProducts} items</p>
             </div>
           </div>
 
           <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
             <div className="mb-4">
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">7-Day Sales Trend</span>
-              <h3 className="font-bold text-sm text-gray-950">Daily Revenues Overview</h3>
+              <span className="text-[10px] text-black font-bold uppercase tracking-widest">7-Day Sales Trend</span>
+              <h3 className="font-bold text-sm text-black">Daily Revenues Overview</h3>
             </div>
             <div className="w-full h-44">
               <ResponsiveContainer width="100%" height="100%">
@@ -334,14 +334,14 @@ export default function AdminOrdersPage() {
                         </span>
                       </div>
                       <p className="text-xs font-bold text-gray-900">{order.customer.fullName}</p>
-                      <p className="text-[11px] text-gray-400">
+                      <p className="text-[11px] text-black">
                         {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleString() : "Syncing..."}
                       </p>
                     </div>
 
                     <div className="text-right">
                       <p className="font-extrabold text-gray-950">${order.financials.grandTotal.toFixed(2)}</p>
-                      <p className="text-[11px] text-gray-400">{order.items.reduce((sum, item) => sum + item.quantity, 0)} items</p>
+                      <p className="text-[11px] text-black">{order.items.reduce((sum, item) => sum + item.quantity, 0)} items</p>
                     </div>
                   </div>
                 ))}
@@ -354,7 +354,7 @@ export default function AdminOrdersPage() {
               <div className="space-y-6">
                 <div className="flex justify-between items-start border-b border-gray-100 pb-4">
                   <div>
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Selected Order</span>
+                    <span className="text-[10px] text-black font-bold uppercase tracking-widest">Selected Order</span>
                     <h2 className="font-mono font-black text-lg text-gray-950">{selectedOrder.orderNumber}</h2>
                   </div>
                   <button
@@ -366,7 +366,7 @@ export default function AdminOrdersPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-2">Fulfillment Status</label>
+                  <label className="block text-[11px] text-black font-bold uppercase tracking-wider mb-2">Fulfillment Status</label>
                   
                   {/* 🎯 Order Status Selection with all 8 choices */}
                   <select
@@ -387,7 +387,7 @@ export default function AdminOrdersPage() {
 
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2 border border-gray-50">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-xs font-bold text-gray-950 uppercase tracking-wider">Shipping Details</h3>
+                    <h3 className="text-xs font-bold text-black uppercase tracking-wider">Shipping Details</h3>
                     <button
                       onClick={() => setShowRefundPanel(!showRefundPanel)}
                       className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
@@ -399,7 +399,7 @@ export default function AdminOrdersPage() {
                       {showRefundPanel ? "Cancel" : "Process Refund"}
                     </button>
                   </div>
-                  <div className="text-xs text-gray-600 space-y-1 pt-1">
+                  <div className="text-xs text-black space-y-1 pt-1">
                     <p className="text-gray-900 font-bold">{selectedOrder.customer.fullName}</p>
                     <p>{selectedOrder.customer.address}</p>
                     <p>{selectedOrder.customer.city}, {selectedOrder.customer.state} {selectedOrder.customer.zipCode}</p>
@@ -455,7 +455,7 @@ export default function AdminOrdersPage() {
                 )}
 
                 <div className="space-y-3">
-                  <h3 className="text-xs font-bold text-gray-950 uppercase tracking-wider">Line Items</h3>
+                  <h3 className="text-xs font-bold text-black uppercase tracking-wider">Line Items</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {selectedOrder.items.map((item, index) => {
                       const itemRetailPrice = item.price || 0;
@@ -466,7 +466,7 @@ export default function AdminOrdersPage() {
                       return (
                         <div key={index} className="flex flex-col border-b border-gray-50 pb-2.5 last:border-0 last:pb-0">
                           <div className="flex gap-3 items-center">
-                            <div className="relative flex-shrink-0">
+                            <div className="relative shrink-0">
                               <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-cover rounded-lg border bg-gray-50" />
                               {item.refunded && (
                                 <span className="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 text-[8px] leading-none font-bold">
@@ -476,7 +476,7 @@ export default function AdminOrdersPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <p className="text-xs font-bold text-gray-950 truncate">{item.name}</p>
+                                <p className="text-xs font-bold text-black truncate">{item.name}</p>
                                 {item.refunded && (
                                   <span className="bg-rose-50 text-rose-600 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">Refunded</span>
                                 )}
@@ -485,7 +485,7 @@ export default function AdminOrdersPage() {
                                 {item.color && `Color: ${item.color}`} {item.size && ` | Size: ${item.size}`}
                               </p>
                             </div>
-                            <div className="text-right text-xs flex-shrink-0">
+                            <div className="text-right text-xs shrink-0">
                               <p className="font-bold text-gray-900">${(itemRetailPrice * item.quantity).toFixed(2)}</p>
                               <p className="text-[10px] text-gray-400 font-medium">{item.quantity}x @ ${itemRetailPrice}</p>
                             </div>
@@ -506,16 +506,16 @@ export default function AdminOrdersPage() {
 
                 <div className="border-t border-gray-100 pt-4 space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Subtotal</span>
-                    <span className="font-medium text-gray-700">${selectedOrder.financials.subtotal.toFixed(2)}</span>
+                    <span className="text-black">Subtotal</span>
+                    <span className="font-medium text-black">${selectedOrder.financials.subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Shipping</span>
-                    <span className="font-medium text-gray-700">${selectedOrder.financials.shipping.toFixed(2)}</span>
+                    <span className="text-black">Shipping</span>
+                    <span className="font-medium text-black">${selectedOrder.financials.shipping.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Tax</span>
-                    <span className="font-medium text-gray-700">${selectedOrder.financials.tax.toFixed(2)}</span>
+                    <span className="text-black">Tax</span>
+                    <span className="font-medium text-black">${selectedOrder.financials.tax.toFixed(2)}</span>
                   </div>
                   
                   {(selectedOrder.financials.refundedAmount || 0) > 0 && (
@@ -527,7 +527,7 @@ export default function AdminOrdersPage() {
                   
                   <div className="flex justify-between items-center border-t border-gray-50 pt-3">
                     <div>
-                      <span className="block font-medium text-gray-400">Grand Total</span>
+                      <span className="block font-medium text-black">Grand Total</span>
                       <span className="font-black text-gray-950 text-base">${selectedOrder.financials.grandTotal.toFixed(2)}</span>
                     </div>
 

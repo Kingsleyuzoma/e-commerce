@@ -81,7 +81,7 @@ export default function Footer() {
             <ul className="space-y-2.5 text-sm">
               <li><Link href="/contact" className="hover:text-pink-500 transition-colors">Contact Us</Link></li>
               <li><Link href="/shipping" className="hover:text-pink-500 transition-colors">Shipping & Delivery</Link></li>
-              <li><Link href="/returns" className="hover:text-pink-500 transition-colors">Returns & Refunds</Link></li>
+              {/* <li><Link href="/returns" className="hover:text-pink-500 transition-colors">Returns & Refunds</Link></li> */}
               <li><Link href="/faq" className="hover:text-pink-500 transition-colors">FAQs</Link></li>
             </ul>
           </div>

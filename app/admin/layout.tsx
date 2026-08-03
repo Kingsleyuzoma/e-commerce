@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useAuth } from "@/Context/AuthContext"; 
@@ -6,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 import { useEffect, useState } from "react"; 
 import Link from "next/link";
-import AdminNotificationPanel from "@/Components/admin/AdminNotificationPanel"; // 👈 Imported your notification component
+import AdminNotificationPanel from "@/Components/admin/AdminNotificationPanel";
 
 export default function AdminLayout({
   children,
@@ -84,24 +83,45 @@ export default function AdminLayout({
         <h2 className="text-xl font-bold text-gray-800 mb-4 hidden md:block">Admin Panel</h2>
         
         <nav className="flex flex-col gap-2">
+          {/* 🏠 Admin Home / Default Overview */}
           <Link 
             href="/admin" 
-            onClick={() => setIsAdminMenuOpen(false)} // Close drawer on navigation
-            className="p-2 hover:bg-gray-200 rounded text-gray-700 font-medium"
+            onClick={() => setIsAdminMenuOpen(false)}
+            className="p-2 hover:bg-gray-200 rounded text-black font-medium flex items-center gap-2"
           >
             🏠 Admin Home
           </Link>
+
+          {/* ⚠️ Low Stock Warnings Link (Switches to Low Stock Tab) */}
+          <Link 
+            href="/admin?tab=low-stock" 
+            onClick={() => setIsAdminMenuOpen(false)}
+            className="p-2 hover:bg-gray-200 rounded text-black font-medium flex items-center justify-between"
+          >
+            <span className="flex items-center gap-2">⚠️ Low Stock Alerts</span>
+          </Link>
+
+          {/* 👥 Customer Insights & Analytics Link (Switches to Insights Tab) */}
+          <Link 
+            href="/admin?tab=customer-insights" 
+            onClick={() => setIsAdminMenuOpen(false)}
+            className="p-2 hover:bg-gray-200 rounded text-black font-medium flex items-center gap-2"
+          >
+            👥 Customer Insights
+          </Link>
+
           <Link 
             href="/admin/products" 
             onClick={() => setIsAdminMenuOpen(false)}
-            className="p-2 hover:bg-gray-200 rounded text-gray-700 font-medium"
+            className="p-2 hover:bg-gray-200 rounded text-black font-medium flex items-center gap-2"
           >
             📊 All Products
           </Link>
+
           <Link 
             href="/admin/add-product" 
             onClick={() => setIsAdminMenuOpen(false)}
-            className="p-2 hover:bg-gray-200 rounded text-gray-700 font-medium"
+            className="p-2 hover:bg-gray-200 rounded text-black font-medium flex items-center gap-2"
           >
             ➕ Add Product
           </Link>
@@ -123,13 +143,13 @@ export default function AdminLayout({
         <header className="hidden md:flex h-16 border-b border-gray-200 bg-white items-center justify-between px-8 sticky top-0 z-30">
           <div>
             <h1 className="font-bold text-gray-800 text-sm">Store Management</h1>
-            <p className="text-[11px] text-gray-400">Control panel & live store analytics</p>
+            <p className="text-[11px] text-black">Control panel & live store analytics</p>
           </div>
 
           <div className="flex items-center gap-6">
             <Link 
               href="/" 
-              className="text-xs text-gray-500 hover:text-gray-900 transition-colors font-medium"
+              className="text-xs text-black hover:text-gray-900 transition-colors font-medium"
             >
               View Storefront
             </Link>
