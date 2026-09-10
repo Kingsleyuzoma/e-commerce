@@ -141,28 +141,28 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Brand & Category */}
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#78716C]">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#200f02]">
             {product.brand}
           </span>
-          <span className="rounded-full bg-[#F1EFE8] px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[#78716C]">
+          <span className="rounded-full bg-[#F1EFE8] px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[#78716C]">
             {product.category}
           </span>
         </div>
 
         {/* Product Name & Description */}
         <Link href={productPath} className="block cursor-pointer">
-          <h3 className="mb-1 font-serif text-[1.05rem] font-medium leading-snug tracking-tight text-[#1C1917] line-clamp-1 transition-colors group-hover:text-[#B23A2E]">
+          <h3 className="mb-1 font-serif text-[1.05rem] font-medium leading-snug tracking-tight text-[#da681c] line-clamp-1 transition-colors group-hover:text-[#B23A2E]">
             {product.name}
           </h3>
         </Link>
-        <p className="mb-3.5 h-8 text-xs leading-relaxed text-[#78716C] line-clamp-2">
+        <p className="mb-3.5 h-8 text-xs leading-relaxed text-[#7a431c] line-clamp-2">
           {product.description}
         </p>
 
         {/* Colors Selection */}
         {hasVariants && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
-            <span className="mr-0.5 text-[10px] uppercase tracking-[0.12em] text-[#A8A29E]">Color</span>
+            <span className="mr-0.5 text-[10px] uppercase tracking-[0.12em] text-[#976849]">Color</span>
             {product.variants.map((v, i) => (
               <button
                 key={i}
@@ -187,7 +187,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Sizes Display */}
         {activeVariant && activeVariant.sizes.length > 0 && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
-            <span className="mr-0.5 text-[10px] uppercase tracking-[0.12em] text-[#A8A29E]">Size</span>
+            <span className="mr-0.5 text-[10px] uppercase tracking-[0.12em] text-[#241002]">Size</span>
             {activeVariant.sizes.map((s, idx) => {
               const isOutOfStock = s.stock === 0;
               const isSelected = selectedSize === s.size;
@@ -199,14 +199,14 @@ export default function ProductCard({ product }: ProductCardProps) {
                   onClick={() => setSelectedSize(s.size)}
                   className={`relative rounded-md border px-2 py-1 text-[11px] font-medium transition-all ${
                     isOutOfStock
-                      ? "cursor-not-allowed border-[#E7E4DC] text-[#D6D3CD] line-through"
+                      ? "cursor-not-allowed border-[#E7E4DC] text-[#251b04] line-through"
                       : isSelected
                       ? "border-[#1C1917] bg-[#1C1917] text-white"
-                      : "border-[#E7E4DC] bg-white text-[#1C1917] hover:border-[#1C1917]/50"
+                      : "border-[#E7E4DC] bg-white text-[#1d0d03] hover:border-[#1C1917]/50"
                   }`}
                 >
                   {s.size}
-                  <span className={`ml-1 text-[9px] ${isSelected ? "text-white/60" : "text-[#A8A29E]"}`}>
+                  <span className={`ml-1 text-[9px] ${isSelected ? "text-white/60" : "text-[#3a1c07]"}`}>
                     {s.stock}
                   </span>
                 </button>
@@ -218,10 +218,10 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       <div>
         {/* Stock Info Status */}
-        <div className="mb-3 flex items-center gap-1.5 text-[11px] font-medium text-[#78716C]">
+        <div className="mb-3 flex items-center gap-1.5 text-[11px] font-medium text-[#2b1505]">
           <span className="relative flex h-2 w-2">
             {totalStock > 0 && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#5F7355] opacity-60" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#112904] opacity-60" />
             )}
             <span className={`relative inline-flex h-2 w-2 rounded-full ${totalStock > 0 ? "bg-[#5F7355]" : "bg-[#B23A2E]"}`} />
           </span>
@@ -243,7 +243,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <div className="flex flex-col rounded-r-md rounded-l-[3px] border border-dashed border-[#D6D3CD] bg-white py-1 pl-3.5 pr-3">
               {hasSale ? (
                 <>
-                  <span className="text-[10px] leading-none text-[#A8A29E] line-through">
+                  <span className="text-[11px] leading-none text-[#2b1406] line-through">
                     ${product.price.toFixed(2)}
                   </span>
                   <span className="font-serif text-lg font-semibold leading-tight text-[#B23A2E]">

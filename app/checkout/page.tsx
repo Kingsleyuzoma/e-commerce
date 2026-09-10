@@ -2,11 +2,12 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useCart } from "@/Context/CartContext"; 
-import { useAuth } from "@/Context/AuthContext"; // 👈 1. Import Auth Context
+import { useAuth } from "@/Context/AuthContext";
 import { calculateUSTax, calculateUSShipping } from "@/utils/usTaxShippingCalculator";
 import { SHIPPING_CONFIG } from "@/config/checkoutConfig";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { reduceProductStock } from "@/utils/inventory";
 import { createOrder } from "@/utils/orders";
 
@@ -16,12 +17,13 @@ import { triggerOrderNotification, requestNotificationPermission } from "@/utils
 import { createPersistentNotification } from "@/utils/dbNotification";
 
 export default function CheckoutPage() {
-  const { user, loading: authLoading } = useAuth(); // 👈 2. Access auth state
+  const { user, loading: authLoading } = useAuth();
   const { cart, clearCart } = useCart();
   const router = useRouter();
 
   // Processing state to disable checkout button click spam
   const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // 📝 Customer Shipping Form State
   const [formData, setFormData] = useState({
@@ -45,7 +47,7 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
-  // 🚀 Shipping Method State (Standard is checked/selected by default)
+  // 🚀 Shipping Method State
   const [shippingMethod, setShippingMethod] = useState<"standard" | "express">("standard");
 
   // 📜 Terms & Conditions Checkbox State
@@ -65,7 +67,6 @@ export default function CheckoutPage() {
   // 🚚 Dynamic Tax and Shipping Calculations
   const baseShippingCost = formData.state ? calculateUSShipping(subtotal, formData.state) : 0;
   
-  // Dynamic calculation: If they choose express, standard shipping gets a premium upgrade (e.g., base + $10)
   const shippingCost = useMemo(() => {
     if (!formData.state) return 0;
     return shippingMethod === "express" ? baseShippingCost + 10.00 : baseShippingCost;
@@ -74,8 +75,9 @@ export default function CheckoutPage() {
   const taxCost = formData.state ? calculateUSTax(subtotal, formData.state) : 0;
   const grandTotal = subtotal + shippingCost + taxCost;
 
-  // Calculate how close they are to free shipping (if they are in a state that qualifies)
-  const isNonContiguous = ["AK", "HI", "PR"].includes(formData.state.toUpperCase());
+  // Safe upper-casing check
+  const stateCode = (formData.state || "").toUpperCase();
+  const isNonContiguous = ["AK", "HI", "PR"].includes(stateCode);
   const amountLeftForFreeShipping = Math.max(0, SHIPPING_CONFIG.freeShippingThreshold - subtotal);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -88,31 +90,32 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
 
     if (!formData.state) {
-      alert("Please select a shipping state to calculate shipping and taxes!");
+      setErrorMessage("Please select a shipping state to calculate shipping and taxes.");
       return;
     }
 
     if (!agreeToTerms) {
-      alert("You must agree to the Terms and Conditions to proceed!");
+      setErrorMessage("You must agree to the Terms and Conditions to proceed.");
       return;
     }
 
     try {
       setIsProcessing(true);
 
-      // 1. 📉 Deduct stock levels inside transaction
+      // 1. Deduct stock levels inside transaction
       await reduceProductStock(cart);
 
-      // 2. 📝 Save Order details to Firestore
+      // 2. Save Order details to Firestore
       const orderNumber = await createOrder(
         {
           ...formData,
-          shippingMethod, // 👈 Dynamically save shipping selection to customer profiles
+          shippingMethod,
         }, 
-        cart,     // Cart items
-        {         // Financial totals
+        cart,
+        {
           subtotal,
           shipping: shippingCost,
           tax: taxCost,
@@ -120,7 +123,7 @@ export default function CheckoutPage() {
         }
       );
 
-      // 3. 📧 Trigger Order Confirmation Email to Customer
+      // 3. Trigger Order Confirmation Email to Customer
       try {
         await fetch("/api/send-order-email", {
           method: "POST",
@@ -141,7 +144,7 @@ export default function CheckoutPage() {
         console.error("Order placed, but failed to send confirmation email:", emailError);
       }
 
-      // 4. 🔔 Save persistent notification inside Admin Panel Database
+      // 4. Save persistent notification inside Admin Panel Database
       await createPersistentNotification(
         "New Order Placed! 🎉",
         `Order #${orderNumber} has been submitted by customer: ${formData.fullName}`,
@@ -149,10 +152,10 @@ export default function CheckoutPage() {
         { orderNumber, grandTotal }
       );
 
-      // 5. 💻 Fire Local Client Browser Native System Notification
+      // 5. Fire Local Client Browser Native System Notification
       triggerOrderNotification(orderNumber, grandTotal);
 
-      // 6. 📄 Auto-download Invoice PDF receipt 
+      // 6. Auto-download Invoice PDF receipt 
       downloadOrderReceipt(
         orderNumber,
         { ...formData, shippingMethod },
@@ -160,20 +163,20 @@ export default function CheckoutPage() {
         { subtotal, shipping: shippingCost, tax: taxCost, grandTotal }
       );
 
-      // 7. 🚀 Clear active shopping bag
+      // 7. Clear active shopping bag
       clearCart();
 
-      // 8. 🚀 Route to your success screen, passing the Order Number in the URL!
+      // 8. Route to success screen
       router.push(`/checkout/success?ord=${orderNumber}`);
     } catch (error: any) {
       console.error("Failed to process order:", error);
-      alert(error.message || "An error occurred while placing your order. Please try again.");
+      setErrorMessage(error.message || "An error occurred while placing your order. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // 3. ⏳ Handle Auth Loading State
+  // Auth Loading State
   if (authLoading) {
     return (
       <div className="max-w-md mx-auto text-center py-20 px-4">
@@ -182,7 +185,7 @@ export default function CheckoutPage() {
     );
   }
 
-  // 4. 🔐 Guard: Require User to Log In Before Checkout
+  // Require User Log In
   if (!user) {
     return (
       <div className="max-w-md mx-auto text-center py-20 px-4">
@@ -209,7 +212,7 @@ export default function CheckoutPage() {
     );
   }
 
-  // 5. 🛒 Check Empty Cart
+  // Check Empty Cart
   if (cart.length === 0) {
     return (
       <div className="max-w-md mx-auto text-center py-20 px-4">
@@ -227,9 +230,15 @@ export default function CheckoutPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-sm text-gray-800">
       <h1 className="text-2xl font-extrabold text-gray-900 mb-8 tracking-tight">Secure Checkout</h1>
 
+      {errorMessage && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">
+          ⚠️ {errorMessage}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* 📝 LEFT COLUMN: Shipping Form & Legal Accords */}
+        {/* LEFT COLUMN: Shipping Form */}
         <form onSubmit={handlePlaceOrder} className="lg:col-span-7 space-y-6">
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
             <h2 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">📦 Shipping Address</h2>
@@ -382,14 +391,13 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* 📦 SELECTABLE SHIPPING OPTIONS (STANDARD IS DEFAULT) */}
+          {/* SELECTABLE SHIPPING OPTIONS */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
             <h2 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">⚡ Choose Shipping Method</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
-              {/* Standard Option (Default) */}
+              {/* Standard Option */}
               <label 
-                onClick={() => setShippingMethod("standard")}
                 className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   shippingMethod === "standard" 
                     ? "border-gray-950 bg-gray-50/50" 
@@ -414,9 +422,8 @@ export default function CheckoutPage() {
                 </span>
               </label>
 
-              {/* Express Option (Check/Click to select) */}
+              {/* Express Option */}
               <label 
-                onClick={() => setShippingMethod("express")}
                 className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   shippingMethod === "express" 
                     ? "border-gray-950 bg-gray-50/50" 
@@ -444,7 +451,7 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* ⚖️ TERMS AND CONDITIONS ACCORD CHECKBOX */}
+          {/* TERMS AND CONDITIONS */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3">
             <input
               type="checkbox"
@@ -475,7 +482,7 @@ export default function CheckoutPage() {
 
         </form>
 
-        {/* 💳 RIGHT COLUMN: Order Summary Card */}
+        {/* RIGHT COLUMN: Order Summary */}
         <div className="lg:col-span-5">
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm sticky top-6">
             <h2 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">🛒 Order Summary</h2>
@@ -505,11 +512,15 @@ export default function CheckoutPage() {
                 const itemPrice = item.product.salePrice || item.product.price;
                 return (
                   <div key={idx} className="flex gap-3 py-3 items-center">
-                    <img 
-                      src={item.product.imageUrl} 
-                      alt={item.product.name} 
-                      className="w-10 h-10 rounded-md object-cover border"
-                    />
+                    <div className="relative w-10 h-10 flex-shrink-0">
+                      <Image 
+                        src={item.product.imageUrl} 
+                        alt={item.product.name} 
+                        fill
+                        sizes="40px"
+                        className="rounded-md object-cover border"
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-800 truncate">{item.product.name}</p>
                       <p className="text-xs text-gray-400">

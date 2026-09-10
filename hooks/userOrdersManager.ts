@@ -1,26 +1,24 @@
-
-import { useState, useEffect, useMemo } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '@/config/firebase';
+import { useState, useEffect } from "react";
+import { db } from "@/config/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
 export interface OrderItem {
   productId: string;
   name: string;
   price: number;
-  costPrice?: number; // 🔄 Made optional to support older orders safely
   quantity: number;
   color?: string;
-  size?: string | number;
-  imageUrl: string;
-  refunded?: boolean;          
-  refundedQuantity?: number;  
+  size?: string;
+  imageUrl?: string;
+  costPrice?: number;
+  refunded?: boolean;
+  refundedQuantity?: number;
 }
 
 export interface Order {
   id: string;
   orderNumber: string;
-  createdAt: any;
-  status: "pending" | "processing" | "shipped" | "cancelled";
+  status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "completed" | "cancelled" | "refunded";
   customer: {
     fullName: string;
     email: string;
@@ -29,6 +27,7 @@ export interface Order {
     city: string;
     state: string;
     zipCode: string;
+    shippingMethod?: string;
   };
   items: OrderItem[];
   financials: {
@@ -36,188 +35,162 @@ export interface Order {
     shipping: number;
     tax: number;
     grandTotal: number;
-    totalCost?: number; 
-    netProfit?: number; 
-    refundedAmount?: number; 
+    refundedAmount?: number;
+  };
+  createdAt?: {
+    seconds: number;
+    nanoseconds: number;
   };
 }
 
-export const useOrdersManager = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+export function useOrdersManager() {
+  const [rawOrders, setRawOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    setLoading(true);
+    
+    // Listen to orders collection in Firestore
+    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedOrders = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Order[];
-      setOrders(fetchedOrders);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching orders: ", error);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedOrders: Order[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            orderNumber: data.orderNumber || doc.id.substring(0, 8),
+            status: data.status || "pending",
+            customer: data.customer || {},
+            items: data.items || [],
+            financials: data.financials || { subtotal: 0, shipping: 0, tax: 0, grandTotal: 0 },
+            createdAt: data.createdAt || null,
+          } as Order;
+        });
+
+        setRawOrders(fetchedOrders);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Firestore Orders Stream Error:", error);
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
 
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const lowerQuery = searchTerm.toLowerCase();
-      
-      const matchesOrderNumber = (order.orderNumber || "").toLowerCase().includes(lowerQuery);
-      const matchesCustomerName = (order.customer?.fullName || "").toLowerCase().includes(lowerQuery);
-      const matchesCustomerEmail = (order.customer?.email || "").toLowerCase().includes(lowerQuery);
-      
-      const matchesProductName = order.items ? order.items.some((item) => 
-        (item.name || "").toLowerCase().includes(lowerQuery)
-      ) : false;
+  // Filter orders based on search input and status drop-down
+  const filteredOrders = rawOrders.filter((order) => {
+    const matchesStatus =
+      statusFilter === "all" ? true : order.status?.toLowerCase() === statusFilter.toLowerCase();
 
-      const matchesSearch = 
-        matchesOrderNumber || 
-        matchesCustomerName || 
-        matchesCustomerEmail || 
-        matchesProductName;
+    const queryLower = searchTerm.toLowerCase();
+    const matchesSearch =
+      !searchTerm ||
+      order.orderNumber?.toLowerCase().includes(queryLower) ||
+      order.customer?.fullName?.toLowerCase().includes(queryLower) ||
+      order.customer?.email?.toLowerCase().includes(queryLower) ||
+      order.items?.some((item) => item.name?.toLowerCase().includes(queryLower));
 
-      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    return matchesStatus && matchesSearch;
+  });
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [orders, searchTerm, statusFilter]);
+  // Calculate dashboard metrics dynamically
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
 
-  const { salesMetrics, profitMetrics, chartData, uniqueCustomersCount, totalRefundedMoney, totalRefundedProducts } = useMemo(() => {
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
+  let dailySales = 0;
+  let monthlySales = 0;
+  let totalSales = 0;
 
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  let dailyProfit = 0;
+  let monthlyProfit = 0;
+  let totalProfit = 0;
 
-    let daily = 0; let weekly = 0; let monthly = 0; let total = 0;
-    
-    // 📊 Profit accumulators tracking variables
-    let dailyProfit = 0; let weeklyProfit = 0; let monthlyProfit = 0; let totalProfit = 0;
+  let totalRefundedMoney = 0;
+  let totalRefundedProducts = 0;
 
-    let refundedMoney = 0;
-    let refundedProducts = 0;
+  const customerEmails = new Set<string>();
 
-    const customerEmails = new Set<string>();
+  rawOrders.forEach((order) => {
+    const grandTotal = order.financials?.grandTotal || 0;
+    const refundedAmount = order.financials?.refundedAmount || 0;
+    const netGrandTotal = grandTotal - refundedAmount;
 
-    const dailySalesMap: { [dateKey: string]: number } = {};
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(now.getDate() - i);
-      const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      dailySalesMap[key] = 0;
+    totalSales += netGrandTotal;
+    totalRefundedMoney += refundedAmount;
+
+    if (order.customer?.email) {
+      customerEmails.add(order.customer.email.toLowerCase());
     }
 
-    orders.forEach((order) => {
-      if (order.customer?.email) {
-        customerEmails.add(order.customer.email.toLowerCase().trim());
-      }
+    // Calculate profits across items
+    let orderProfit = 0;
+    (order.items || []).forEach((item) => {
+      const retailPrice = item.price || 0;
+      const costPrice = item.costPrice !== undefined ? item.costPrice : retailPrice * 0.6;
+      const qty = item.quantity || 1;
 
-      if (order.financials?.refundedAmount) {
-        refundedMoney += order.financials.refundedAmount;
-      }
-
-      if (order.items) {
-        order.items.forEach((item) => {
-          if (item.refunded) {
-            refundedProducts += item.refundedQuantity || item.quantity;
-          }
-        });
-      }
-
-      if (order.status === 'cancelled') return;
-
-      const totalAmount = order.financials?.grandTotal || 0;
-      const orderDate = order.createdAt ? new Date(order.createdAt.seconds * 1000) : null;
-
-      if (!orderDate) return;
-
-      // 🎯 DYNAMIC PROFIT CALCULATION FALLBACK SYSTEM
-      // Loop over items directly to sum profit, avoiding reliance on missing top-level document properties
-      let computedOrderProfit = 0;
-      if (order.items && order.items.length > 0) {
-        order.items.forEach((item) => {
-          const itemPrice = item.price || 0;
-          
-          // 💡 If costPrice is missing from older checkout collections, estimate at a 40% margin base fallback so analytics don't break
-          const itemCost = item.costPrice !== undefined ? item.costPrice : (itemPrice * 0.6);
-          
-          const activeQty = item.quantity || 1;
-          const refundedQty = item.refunded ? (item.refundedQuantity || activeQty) : 0;
-          const netQty = Math.max(0, activeQty - refundedQty);
-
-          computedOrderProfit += (itemPrice - itemCost) * netQty;
-        });
+      if (item.refunded) {
+        totalRefundedProducts += qty;
       } else {
-        // Ultimate fallback if items array doesn't exist
-        computedOrderProfit = (order.financials?.subtotal || totalAmount) * 0.4;
-      }
-
-      // Deduct external direct adjustments if needed
-      if (!order.items?.some(i => i.refunded) && order.financials?.refundedAmount) {
-        computedOrderProfit -= order.financials.refundedAmount;
-      }
-
-      total += totalAmount;
-      totalProfit += computedOrderProfit;
-
-      if (orderDate >= startOfToday) {
-        daily += totalAmount;
-        dailyProfit += computedOrderProfit;
-      }
-      if (orderDate >= startOfWeek) {
-        weekly += totalAmount;
-        weeklyProfit += computedOrderProfit;
-      }
-      if (orderDate >= startOfMonth) {
-        monthly += totalAmount;
-        monthlyProfit += computedOrderProfit;
-      }
-
-      const dateKey = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      if (dateKey in dailySalesMap) {
-        dailySalesMap[dateKey] += totalAmount;
+        orderProfit += (retailPrice - costPrice) * qty;
       }
     });
 
-    const formattedChartData = Object.keys(dailySalesMap).map((date) => ({
-      date,
-      Sales: parseFloat(dailySalesMap[date].toFixed(2)),
-    }));
+    totalProfit += orderProfit;
 
-    return {
-      salesMetrics: { daily, weekly, monthly, total },
-      profitMetrics: { daily: dailyProfit, weekly: weeklyProfit, monthly: monthlyProfit, total: totalProfit },
-      chartData: formattedChartData,
-      uniqueCustomersCount: customerEmails.size,
-      totalRefundedMoney: refundedMoney,
-      totalRefundedProducts: refundedProducts,
-    };
-  }, [orders]);
+    if (order.createdAt?.seconds) {
+      const orderDate = new Date(order.createdAt.seconds * 1000);
+
+      if (orderDate.toDateString() === todayStr) {
+        dailySales += netGrandTotal;
+        dailyProfit += orderProfit;
+      }
+
+      if (orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear) {
+        monthlySales += netGrandTotal;
+        monthlyProfit += orderProfit;
+      }
+    }
+  });
+
+  // Build chart dataset for the last 7 days
+  const chartData = Array.from({ length: 7 }).map((_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+    const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+    const dayTotal = rawOrders.reduce((sum, order) => {
+      if (!order.createdAt?.seconds) return sum;
+      const orderDate = new Date(order.createdAt.seconds * 1000);
+      if (orderDate.toDateString() === date.toDateString()) {
+        return sum + ((order.financials?.grandTotal || 0) - (order.financials?.refundedAmount || 0));
+      }
+      return sum;
+    }, 0);
+
+    return { date: dateStr, Sales: dayTotal };
+  });
 
   return {
     orders: filteredOrders,
-    allOrdersCount: orders.length,
-    salesMetrics,
-    profitMetrics, 
+    salesMetrics: { daily: dailySales, monthly: monthlySales, total: totalSales },
+    profitMetrics: { daily: dailyProfit, monthly: monthlyProfit, total: totalProfit },
     chartData,
-    uniqueCustomersCount,     
-    totalRefundedMoney,       
-    totalRefundedProducts,    
+    uniqueCustomersCount: customerEmails.size,
+    totalRefundedMoney,
+    totalRefundedProducts,
     searchTerm,
     setSearchTerm,
     statusFilter,
     setStatusFilter,
     loading,
   };
-};
+}

@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+e-commerce-11d5f-firebase-adminsdk-fbsvc-b3580c118b.json

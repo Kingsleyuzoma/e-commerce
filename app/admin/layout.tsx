@@ -85,7 +85,7 @@ export default function AdminLayout({
         <nav className="flex flex-col gap-2">
           {/* 🏠 Admin Home / Default Overview */}
           <Link 
-            href="/admin" 
+            href="/admin/dashboard" 
             onClick={() => setIsAdminMenuOpen(false)}
             className="p-2 hover:bg-gray-200 rounded text-black font-medium flex items-center gap-2"
           >
@@ -94,7 +94,7 @@ export default function AdminLayout({
 
           {/* ⚠️ Low Stock Warnings Link (Switches to Low Stock Tab) */}
           <Link 
-            href="/admin?tab=low-stock" 
+            href="/admin/dashboard?tab=low-stock" 
             onClick={() => setIsAdminMenuOpen(false)}
             className="p-2 hover:bg-gray-200 rounded text-black font-medium flex items-center justify-between"
           >
@@ -103,7 +103,7 @@ export default function AdminLayout({
 
           {/* 👥 Customer Insights & Analytics Link (Switches to Insights Tab) */}
           <Link 
-            href="/admin?tab=customer-insights" 
+            href="/admin/dashboard?tab=customer-insights" 
             onClick={() => setIsAdminMenuOpen(false)}
             className="p-2 hover:bg-gray-200 rounded text-black font-medium flex items-center gap-2"
           >
@@ -142,8 +142,8 @@ export default function AdminLayout({
         {/* 🖥️ Desktop Navigation Utility Bar (Hidden on Mobile) */}
         <header className="hidden md:flex h-16 border-b border-gray-200 bg-white items-center justify-between px-8 sticky top-0 z-30">
           <div>
-            <h1 className="font-bold text-gray-800 text-sm">Store Management</h1>
-            <p className="text-[11px] text-black">Control panel & live store analytics</p>
+            <h1 className="font-bold text-gray-800 text-2xl">Store Management</h1>
+            <p className="text-[15px] text-black">Control panel & live store analytics</p>
           </div>
 
           <div className="flex items-center gap-6">

@@ -1,27 +1,28 @@
-
 "use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { resetUserPassword } from "../actions/auth";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/config/firebase";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
 
     try {
-      await resetUserPassword(email);
-      setSuccess(true);
+      // 🛡️ Send password reset email directly via Firebase Client SDK
+      await sendPasswordResetEmail(auth, email);
     } catch (err: any) {
-      setError(err.message || "Failed to send reset link.");
+      // Log the real error internally for debugging without exposing account status to attackers
+      console.error("Password reset trigger error:", err);
     } finally {
+      // Always transition to submitted state to prevent account enumeration vulnerabilities
+      setSubmitted(true);
       setLoading(false);
     }
   };
@@ -43,7 +44,7 @@ export default function ForgotPasswordPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 border border-gray-100 shadow-sm rounded-2xl sm:px-10">
-          {success ? (
+          {submitted ? (
             <div className="space-y-6 text-center py-4">
               {/* Success Badge */}
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 mb-2">
@@ -64,8 +65,7 @@ export default function ForgotPasswordPage() {
               <div>
                 <h3 className="font-bold text-gray-950 text-base">Check your email</h3>
                 <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-                  We sent a password reset link to <strong className="text-gray-700">{email}</strong>. 
-                  Please check your spam folder if you do not receive it within a few minutes.
+                  If an account exists for <strong className="text-gray-700">{email}</strong>, you will receive a password reset link shortly. Please check your spam folder as well.
                 </p>
               </div>
               <div className="pt-4">
@@ -79,12 +79,6 @@ export default function ForgotPasswordPage() {
             </div>
           ) : (
             <form className="space-y-6" onSubmit={handleSubmit}>
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-[11px] text-red-600 font-medium leading-relaxed">
-                  ⚠️ {error}
-                </div>
-              )}
-
               <div>
                 <label
                   htmlFor="email"

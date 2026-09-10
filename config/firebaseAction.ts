@@ -2,6 +2,7 @@ import { db, storage } from "./firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { collection, addDoc } from "firebase/firestore";
 
+
 // 📤 1. Uploads image file immediately when selected
 export const uploadProductImage = async (
   imageFile: File,

@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { useOrdersManager } from "@/hooks/userOrdersManager";
+import { useOrdersManager, Order } from "@/hooks/userOrdersManager";
 import { updateOrderStatus, deleteOrder } from "@/utils/admin";
-import { Order, OrderItem } from "@/hooks/userOrdersManager";
 import Link from "next/link";
 import { downloadOrderReceipt } from "@/utils/receiptGenerator";
 import { db } from "@/config/firebase";
 import { doc, updateDoc } from "firebase/firestore";
-import {
+
+import { 
   AreaChart,
   Area,
   XAxis,
@@ -18,7 +18,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// 🎨 Helper for dynamic order status styling
 const getAdminStatusBadgeStyle = (status: string) => {
   switch (status?.toLowerCase()) {
     case "confirmed":
@@ -43,13 +42,13 @@ const getAdminStatusBadgeStyle = (status: string) => {
 
 export default function AdminOrdersPage() {
   const { 
-    orders, 
-    salesMetrics, 
-    profitMetrics, 
-    chartData, 
-    uniqueCustomersCount,
-    totalRefundedMoney,
-    totalRefundedProducts,
+    orders = [], 
+    salesMetrics = { daily: 0, monthly: 0, total: 0 }, 
+    profitMetrics = { daily: 0, monthly: 0, total: 0 }, 
+    chartData = [], 
+    uniqueCustomersCount = 0,
+    totalRefundedMoney = 0,
+    totalRefundedProducts = 0,
     searchTerm, 
     setSearchTerm, 
     statusFilter, 
@@ -94,16 +93,16 @@ export default function AdminOrdersPage() {
       return;
     }
 
-    const currentRefundedAmount = selectedOrder.financials.refundedAmount || 0;
+    const currentRefundedAmount = selectedOrder.financials?.refundedAmount || 0;
     const newRefundedAmount = currentRefundedAmount + parsedRefundAmount;
 
-    if (newRefundedAmount > selectedOrder.financials.grandTotal) {
+    if (newRefundedAmount > (selectedOrder.financials?.grandTotal || 0)) {
       alert("Total refunds cannot exceed the grand total value of the order.");
       return;
     }
 
     try {
-      const updatedItems = selectedOrder.items.map((item) => {
+      const updatedItems = (selectedOrder.items || []).map((item) => {
         const isSelectedForRefund = refundedItemsState[item.productId];
         if (isSelectedForRefund) {
           return {
@@ -155,23 +154,23 @@ export default function AdminOrdersPage() {
 
   const handleDownloadReceipt = (order: Order) => {
     const mappedCustomer = {
-      fullName: order.customer.fullName,
-      email: order.customer.email,
-      phone: order.customer.phone,
-      address: order.customer.address,
-      city: order.customer.city,
-      state: order.customer.state,
-      zipCode: order.customer.zipCode,
-      shippingMethod: order.customer.shippingMethod || "standard",
+      fullName: order.customer?.fullName || "Guest",
+      email: order.customer?.email || "N/A",
+      phone: order.customer?.phone || "N/A",
+      address: order.customer?.address || "N/A",
+      city: order.customer?.city || "",
+      state: order.customer?.state || "",
+      zipCode: order.customer?.zipCode || "",
+      shippingMethod: order.customer?.shippingMethod || "standard",
     };
 
-    const mappedCart = order.items.map((item) => ({
+    const mappedCart = (order.items || []).map((item) => ({
       product: {
-        name: item.name,
-        price: item.price,
+        name: item.name || "Product",
+        price: item.price || 0,
         salePrice: null,
       },
-      quantity: item.quantity,
+      quantity: item.quantity || 1,
       selectedColor: item.color || "",
       selectedSize: item.size || "",
     }));
@@ -209,7 +208,6 @@ export default function AdminOrdersPage() {
               className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-gray-900 transition-colors w-full sm:w-64"
             />
 
-            {/* 🎯 Filter dropdown with all 8 statuses */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -233,18 +231,18 @@ export default function AdminOrdersPage() {
           <div className="grid grid-cols-2 gap-4 h-full">
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-black font-bold uppercase tracking-wider">Today's Sales</p>
-              <p className="text-lg md:text-2xl font-black text-emerald-600 mt-2">${salesMetrics.daily.toFixed(2)}</p>
-              <p className="text-[10px] text-emerald-700 font-bold bg-emerald-50/50 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.daily.toFixed(2)}</p>
+              <p className="text-lg md:text-2xl font-black text-emerald-600 mt-2">${(salesMetrics?.daily || 0).toFixed(2)}</p>
+              <p className="text-[10px] text-emerald-700 font-bold bg-emerald-50/50 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${(profitMetrics?.daily || 0).toFixed(2)}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-black font-bold uppercase tracking-wider">This Month</p>
-              <p className="text-lg md:text-2xl font-black text-purple-600 mt-2">${salesMetrics.monthly.toFixed(2)}</p>
-              <p className="text-[10px] text-purple-700 font-bold bg-purple-50/50 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.monthly.toFixed(2)}</p>
+              <p className="text-lg md:text-2xl font-black text-purple-600 mt-2">${(salesMetrics?.monthly || 0).toFixed(2)}</p>
+              <p className="text-[10px] text-purple-700 font-bold bg-purple-50/50 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${(profitMetrics?.monthly || 0).toFixed(2)}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-black font-bold uppercase tracking-wider">Total Revenue</p>
-              <p className="text-lg md:text-2xl font-black text-gray-950 mt-2">${salesMetrics.total.toFixed(2)}</p>
-              <p className="text-[10px] text-gray-950 font-bold bg-gray-100 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${profitMetrics.total.toFixed(2)}</p>
+              <p className="text-lg md:text-2xl font-black text-gray-950 mt-2">${(salesMetrics?.total || 0).toFixed(2)}</p>
+              <p className="text-[10px] text-gray-950 font-bold bg-gray-100 px-2 py-0.5 rounded mt-1.5 w-fit">Profit: ${(profitMetrics?.total || 0).toFixed(2)}</p>
             </div>
             
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
@@ -254,7 +252,7 @@ export default function AdminOrdersPage() {
 
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
               <p className="text-[10px] text-black font-bold uppercase tracking-wider">Refunded Cash</p>
-              <p className="text-lg md:text-2xl font-black text-rose-600 mt-2">${totalRefundedMoney.toFixed(2)}</p>
+              <p className="text-lg md:text-2xl font-black text-rose-600 mt-2">${(totalRefundedMoney || 0).toFixed(2)}</p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
@@ -282,7 +280,7 @@ export default function AdminOrdersPage() {
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10 }} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1f2937', borderRadius: '12px', border: 'none', color: '#ffffff', fontSize: '11px' }}
-                    labelStyle={{ fontSpread: 'bold', color: '#9ca3af' }}
+                    labelStyle={{ fontStyle: 'normal', color: '#9ca3af' }}
                   />
                   <Area type="monotone" dataKey="Sales" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
                 </AreaChart>
@@ -323,8 +321,6 @@ export default function AdminOrdersPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-black text-gray-950">{order.orderNumber}</span>
-                        
-                        {/* 🎯 Updated Status Badge Tag */}
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getAdminStatusBadgeStyle(
                             order.status
@@ -333,15 +329,19 @@ export default function AdminOrdersPage() {
                           {order.status || "pending"}
                         </span>
                       </div>
-                      <p className="text-xs font-bold text-gray-900">{order.customer.fullName}</p>
+                      <p className="text-xs font-bold text-gray-900">{order.customer?.fullName || "Guest Customer"}</p>
                       <p className="text-[11px] text-black">
-                        {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleString() : "Syncing..."}
+                        {order.createdAt?.seconds 
+                          ? new Date(order.createdAt.seconds * 1000).toLocaleString() 
+                          : "Syncing..."}
                       </p>
                     </div>
 
                     <div className="text-right">
-                      <p className="font-extrabold text-gray-950">${order.financials.grandTotal.toFixed(2)}</p>
-                      <p className="text-[11px] text-black">{order.items.reduce((sum, item) => sum + item.quantity, 0)} items</p>
+                      <p className="font-extrabold text-gray-950">${(order.financials?.grandTotal || 0).toFixed(2)}</p>
+                      <p className="text-[11px] text-black">
+                        {(order.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)} items
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -367,8 +367,6 @@ export default function AdminOrdersPage() {
 
                 <div>
                   <label className="block text-[11px] text-black font-bold uppercase tracking-wider mb-2">Fulfillment Status</label>
-                  
-                  {/* 🎯 Order Status Selection with all 8 choices */}
                   <select
                     value={selectedOrder.status}
                     onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
@@ -400,11 +398,11 @@ export default function AdminOrdersPage() {
                     </button>
                   </div>
                   <div className="text-xs text-black space-y-1 pt-1">
-                    <p className="text-gray-900 font-bold">{selectedOrder.customer.fullName}</p>
-                    <p>{selectedOrder.customer.address}</p>
-                    <p>{selectedOrder.customer.city}, {selectedOrder.customer.state} {selectedOrder.customer.zipCode}</p>
-                    <p className="pt-2 font-medium">✉ {selectedOrder.customer.email}</p>
-                    <p className="font-medium">📞 {selectedOrder.customer.phone}</p>
+                    <p className="text-gray-900 font-bold">{selectedOrder.customer?.fullName}</p>
+                    <p>{selectedOrder.customer?.address}</p>
+                    <p>{selectedOrder.customer?.city}, {selectedOrder.customer?.state} {selectedOrder.customer?.zipCode}</p>
+                    <p className="pt-2 font-medium">✉ {selectedOrder.customer?.email}</p>
+                    <p className="font-medium">📞 {selectedOrder.customer?.phone}</p>
                   </div>
                 </div>
 
@@ -414,7 +412,7 @@ export default function AdminOrdersPage() {
                     
                     <div className="space-y-1.5">
                       <p className="text-[10px] text-rose-800 font-bold">Select items returned/refunded:</p>
-                      {selectedOrder.items.map((item) => (
+                      {(selectedOrder.items || []).map((item) => (
                         <label 
                           key={item.productId} 
                           className="flex items-center gap-2 text-xs text-gray-700 bg-white p-2 rounded-lg border border-gray-150 cursor-pointer hover:bg-gray-50"
@@ -429,7 +427,7 @@ export default function AdminOrdersPage() {
                           <span className="flex-1 truncate font-medium">
                             {item.name} {item.refunded && <span className="text-[9px] text-rose-600 font-bold">(Already Refunded)</span>}
                           </span>
-                          <span className="font-bold text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
+                          <span className="font-bold text-gray-900">${((item.price || 0) * (item.quantity || 1)).toFixed(2)}</span>
                         </label>
                       ))}
                     </div>
@@ -457,11 +455,11 @@ export default function AdminOrdersPage() {
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-black uppercase tracking-wider">Line Items</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {selectedOrder.items.map((item, index) => {
+                    {(selectedOrder.items || []).map((item, index) => {
                       const itemRetailPrice = item.price || 0;
                       const itemCostPrice = item.costPrice !== undefined ? item.costPrice : (itemRetailPrice * 0.6);
                       const singleItemProfit = itemRetailPrice - itemCostPrice;
-                      const totalItemProfit = singleItemProfit * item.quantity;
+                      const totalItemProfit = singleItemProfit * (item.quantity || 1);
 
                       return (
                         <div key={index} className="flex flex-col border-b border-gray-50 pb-2.5 last:border-0 last:pb-0">
@@ -486,7 +484,7 @@ export default function AdminOrdersPage() {
                               </p>
                             </div>
                             <div className="text-right text-xs shrink-0">
-                              <p className="font-bold text-gray-900">${(itemRetailPrice * item.quantity).toFixed(2)}</p>
+                              <p className="font-bold text-gray-900">${(itemRetailPrice * (item.quantity || 1)).toFixed(2)}</p>
                               <p className="text-[10px] text-gray-400 font-medium">{item.quantity}x @ ${itemRetailPrice}</p>
                             </div>
                           </div>
@@ -507,18 +505,18 @@ export default function AdminOrdersPage() {
                 <div className="border-t border-gray-100 pt-4 space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-black">Subtotal</span>
-                    <span className="font-medium text-black">${selectedOrder.financials.subtotal.toFixed(2)}</span>
+                    <span className="font-medium text-black">${(selectedOrder.financials?.subtotal || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-black">Shipping</span>
-                    <span className="font-medium text-black">${selectedOrder.financials.shipping.toFixed(2)}</span>
+                    <span className="font-medium text-black">${(selectedOrder.financials?.shipping || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-black">Tax</span>
-                    <span className="font-medium text-black">${selectedOrder.financials.tax.toFixed(2)}</span>
+                    <span className="font-medium text-black">${(selectedOrder.financials?.tax || 0).toFixed(2)}</span>
                   </div>
                   
-                  {(selectedOrder.financials.refundedAmount || 0) > 0 && (
+                  {(selectedOrder.financials?.refundedAmount || 0) > 0 && (
                     <div className="flex justify-between text-rose-600 font-bold bg-rose-50/50 p-2 rounded-lg border border-rose-100/50">
                       <span>Amount Refunded</span>
                       <span>-${selectedOrder.financials.refundedAmount?.toFixed(2)}</span>
@@ -528,7 +526,7 @@ export default function AdminOrdersPage() {
                   <div className="flex justify-between items-center border-t border-gray-50 pt-3">
                     <div>
                       <span className="block font-medium text-black">Grand Total</span>
-                      <span className="font-black text-gray-950 text-base">${selectedOrder.financials.grandTotal.toFixed(2)}</span>
+                      <span className="font-black text-gray-950 text-base">${(selectedOrder.financials?.grandTotal || 0).toFixed(2)}</span>
                     </div>
 
                     <button

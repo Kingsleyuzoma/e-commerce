@@ -8,7 +8,7 @@ export const downloadOrderReceipt = (orderNumber: string, customer: any, cart: a
   // --- Header styling ---
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(20);
-  doc.text("YOUR STORE RECEIPT", 14, 20);
+  doc.text("THE HORIZON STORE RECEIPT", 14, 20);
 
   // --- ⏱️ Generate Full Date and Time Stamp ---
   const now = new Date();
