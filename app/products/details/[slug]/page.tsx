@@ -161,14 +161,16 @@ export default function ProductDetailsPage(props: PageProps) {
       quantity,
       selectedColor: hasVariants ? selectedColor : "",
       selectedSize: hasVariants ? String(selectedSize || "") : "",
-      product: {
-        id: product.id,
-        name: product.name,
-        brand: product.brand,
-        price: product.price,
-        salePrice: product.isOnSale ? finalPrice : undefined,
-        imageUrl: product.imageUrl,
-      },
+     product: {
+  id: product.id,
+  name: product.name,
+  brand: product.brand,
+  price: product.price,
+  salePrice: product.salePrice,
+  imageUrl: product.imageUrl,
+  description: product.description || "", // 👈 Add this
+  category: product.category || "",       // 👈 Add this
+}
     });
 
     alert("Added to cart");
