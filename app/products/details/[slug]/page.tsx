@@ -160,7 +160,7 @@ export default function ProductDetailsPage(props: PageProps) {
       id: hasVariants ? `${product.id}-${selectedColor}-${selectedSize}` : `${product.id}-default`,
       quantity,
       selectedColor: hasVariants ? selectedColor : "",
-      selectedSize: hasVariants ? selectedSize : "",
+      selectedSize: hasVariants ? String(selectedSize || "") : "",
       product: {
         id: product.id,
         name: product.name,
