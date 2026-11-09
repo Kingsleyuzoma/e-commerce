@@ -8,20 +8,16 @@ import { SHIPPING_CONFIG } from "@/config/checkoutConfig";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { reduceProductStock } from "@/utils/inventory";
-import { createOrder } from "@/utils/orders";
 
-// 🔔 Notification & Receipt Utilities Import
-import { downloadOrderReceipt } from "@/utils/receiptGenerator";
-import { triggerOrderNotification, requestNotificationPermission } from "@/utils/notification";
-import { createPersistentNotification } from "@/utils/dbNotification";
+// 🔔 Notification Utilities Import
+import { requestNotificationPermission } from "@/utils/notification";
 
 export default function CheckoutPage() {
   const { user, loading: authLoading } = useAuth();
-  const { cart, clearCart } = useCart();
+  const { cart } = useCart();
   const router = useRouter();
 
-  // Processing state to disable checkout button click spam
+  // Processing state to disable button click spam
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -88,7 +84,8 @@ export default function CheckoutPage() {
     }));
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
+  // 💳 PAYSTACK SECURE CHECKOUT HANDLER
+ const handlePaystackCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -104,74 +101,64 @@ export default function CheckoutPage() {
 
     try {
       setIsProcessing(true);
+      const uniqueReference = `FEMEL-${Date.now()}`;
 
-      // 1. Deduct stock levels inside transaction
-      await reduceProductStock(cart);
-
-      // 2. Save Order details to Firestore
-      const orderNumber = await createOrder(
-        {
-          ...formData,
-          shippingMethod,
-        }, 
-        cart,
-        {
-          subtotal,
-          shipping: shippingCost,
-          tax: taxCost,
-          grandTotal,
-        }
-      );
-
-      // 3. Trigger Order Confirmation Email to Customer
-      try {
-        await fetch("/api/send-order-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: formData.email,
-            customerName: formData.fullName,
-            orderNumber,
-            items: cart.map((item) => ({
-              title: item.product.name,
-              quantity: item.quantity,
+      // Call Paystack initialization API route with full cart & customer metadata
+      const res = await fetch("/api/paystack/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          amount: grandTotal,
+          reference: uniqueReference,
+          metadata: {
+            customer_info: {
+              fullName: formData.fullName,
+              phone: formData.phone,
+              address: formData.address,
+              city: formData.city,
+              state: formData.state,
+              zipCode: formData.zipCode,
+              shippingMethod,
+              userId: user?.uid || null,
+            },
+            financials: {
+              subtotal,
+              shipping: shippingCost,
+              tax: taxCost,
+              grandTotal,
+            },
+            cart_items: cart.map(item => ({
+              productId: item.product.id,
+              name: item.product.name,
               price: item.product.salePrice || item.product.price,
+              quantity: item.quantity,
+              selectedColor: item.selectedColor || null,
+              selectedSize: item.selectedSize || null,
+              imageUrl: item.product.imageUrl || "",
             })),
-            grandTotal,
-          }),
-        });
-      } catch (emailError) {
-        console.error("Order placed, but failed to send confirmation email:", emailError);
+            custom_fields: [
+              {
+                display_name: "Customer Name",
+                variable_name: "customer_name",
+                value: formData.fullName,
+              },
+            ],
+          },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        setErrorMessage(data.error || "Could not initialize payment gateway.");
+        setIsProcessing(false);
       }
-
-      // 4. Save persistent notification inside Admin Panel Database
-      await createPersistentNotification(
-        "New Order Placed! 🎉",
-        `Order #${orderNumber} has been submitted by customer: ${formData.fullName}`,
-        "order_placed",
-        { orderNumber, grandTotal }
-      );
-
-      // 5. Fire Local Client Browser Native System Notification
-      triggerOrderNotification(orderNumber, grandTotal);
-
-      // 6. Auto-download Invoice PDF receipt 
-      downloadOrderReceipt(
-        orderNumber,
-        { ...formData, shippingMethod },
-        cart,
-        { subtotal, shipping: shippingCost, tax: taxCost, grandTotal }
-      );
-
-      // 7. Clear active shopping bag
-      clearCart();
-
-      // 8. Route to success screen
-      router.push(`/checkout/success?ord=${orderNumber}`);
-    } catch (error: any) {
-      console.error("Failed to process order:", error);
-      setErrorMessage(error.message || "An error occurred while placing your order. Please try again.");
-    } finally {
+    } catch (err: any) {
+      console.error("Checkout error:", err);
+      setErrorMessage("An error occurred while connecting to Paystack.");
       setIsProcessing(false);
     }
   };
@@ -238,8 +225,8 @@ export default function CheckoutPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* LEFT COLUMN: Shipping Form */}
-        <form onSubmit={handlePlaceOrder} className="lg:col-span-7 space-y-6">
+        {/* LEFT COLUMN: Shipping Form & Paystack Checkout */}
+        <form onSubmit={handlePaystackCheckout} className="lg:col-span-7 space-y-6">
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
             <h2 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">📦 Shipping Address</h2>
             
@@ -477,7 +464,7 @@ export default function CheckoutPage() {
             disabled={isProcessing}
             className="w-full bg-gray-900 text-white font-bold py-3.5 px-4 rounded-xl hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm cursor-pointer text-sm"
           >
-            {isProcessing ? "Processing Order..." : `Complete Purchase ($${grandTotal.toFixed(2)})`}
+            {isProcessing ? "Redirecting to Paystack..." : `Proceed to Pay ($${grandTotal.toFixed(2)})`}
           </button>
 
         </form>
@@ -512,7 +499,7 @@ export default function CheckoutPage() {
                 const itemPrice = item.product.salePrice || item.product.price;
                 return (
                   <div key={idx} className="flex gap-3 py-3 items-center">
-                    <div className="relative w-10 h-10 flex-shrink-0">
+                    <div className="relative w-10 h-10 shrink-0">
                       <Image 
                         src={item.product.imageUrl} 
                         alt={item.product.name} 
@@ -552,7 +539,7 @@ export default function CheckoutPage() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Sales Tax (5% LA Only)</span>
+                <span>Sales Tax</span>
                 <span className="font-medium text-gray-800">
                   {!formData.state ? (
                     <span className="text-xs text-gray-400 font-normal">Select state first</span>

@@ -4,6 +4,11 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // 🛑 Allow success page through without cookie checks (Paystack redirect return)
+  if (pathname.startsWith("/checkout/success")) {
+    return NextResponse.next();
+  }
+
   // 1. Retrieve session cookies
   const userSession = request.cookies.get("user_session")?.value;
 
