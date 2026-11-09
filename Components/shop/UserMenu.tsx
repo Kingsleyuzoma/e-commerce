@@ -167,7 +167,7 @@ export default function UserMenu() {
   };
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div className="relative inline-block " ref={dropdownRef}>
       {/* 👤 Trigger Button: User Avatar */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -190,7 +190,7 @@ export default function UserMenu() {
 
       {/* 📂 Dropdown Menu Card */}
       {isOpen && (
-        <div className="absolute right-0 mt-2.5 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 py-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+       <div className="absolute left-0 -translate-x-1/2 mt-2.5 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 py-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
           
           {/* User Info Header */}
           <div className="px-4 py-2 border-b border-gray-50 flex flex-col space-y-1">
@@ -232,7 +232,7 @@ export default function UserMenu() {
               logout();
               setIsOpen(false);
             }}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium transition"
+            className="w-full text-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium transition"
           >
             Sign Out
           </button>

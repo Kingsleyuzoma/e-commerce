@@ -217,10 +217,12 @@ const Navbar = () => {
           )}
 
           <div className="pt-4 border-t border-gray-100">
-            <div className="flex justify-center py-2">
-              <UserMenu />
-            </div>
-          </div>
+         <div className="flex justify-center py-2">
+         <div className="relative inline-block">
+         <UserMenu />
+         </div>
+         </div>
+         </div>
         </div>
       )}
     </nav>
