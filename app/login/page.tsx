@@ -88,7 +88,7 @@ function LoginFormContent() {
                 onChange={handleChange}
                 required
                 disabled={loading}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-500 focus:bg-white transition-all"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-black placeholder-gray-500 focus:outline-none focus:border-pink-500 focus:bg-white transition-all"
                 placeholder="jane@example.com"
               />
             </div>
