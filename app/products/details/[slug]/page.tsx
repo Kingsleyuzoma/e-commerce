@@ -133,7 +133,7 @@ export default function ProductDetailsPage(props: PageProps) {
         <p className="text-sm text-[#78716C]">We couldn't find what you're looking for.</p>
         <button
           onClick={() => router.back()}
-          className="mt-2 rounded-full border border-[#1C1917]/15 px-5 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#1C1917] transition-colors hover:bg-[#1C1917] hover:text-white"
+          className="mt-2 rounded-full border border-[#1C1917]/15 px-5 py-2 text-xs font-semibold uppercase tracking-widest text-[#1C1917] transition-colors hover:bg-[#1C1917] hover:text-white"
         >
           Go Back
         </button>
@@ -225,7 +225,7 @@ export default function ProductDetailsPage(props: PageProps) {
             <h1 className="mt-2 font-serif text-3xl font-medium leading-tight tracking-tight text-[#1C1917]">{product.name}</h1>
 
             <div className="relative mt-5 inline-block">
-              <span className="pointer-events-none absolute -left-[3px] top-1/2 z-10 h-[7px] w-[7px] -translate-y-1/2 rounded-full border border-[#E7E4DC] bg-[#FAF9F6]" />
+              <span className="pointer-events-none absolute -left-0.75 top-1/2 z-10 h-1.75 w-1.75 -translate-y-1/2 rounded-full border border-[#E7E4DC] bg-[#FAF9F6]" />
               <div className="flex items-center gap-3 rounded-r-md rounded-l-[3px] border border-dashed border-[#D6D3CD] bg-white py-1.5 pl-4 pr-4">
                 {product.isOnSale ? (
                   <>
@@ -312,7 +312,7 @@ export default function ProductDetailsPage(props: PageProps) {
                   +
                 </button>
               </div>
-              <span className="text-xs uppercase tracking-[0.1em] text-[#A8A29E]">
+              <span className="text-xs uppercase tracking-widest text-[#A8A29E]">
                 Stock: <span className="font-semibold text-[#1C1917]">{currentStock}</span>
               </span>
             </div>
@@ -320,7 +320,7 @@ export default function ProductDetailsPage(props: PageProps) {
             <button
               disabled={currentStock === 0}
               onClick={handleAddToCart}
-              className="mt-8 w-full cursor-pointer rounded-full bg-[#1C1917] py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition-colors hover:bg-[#B23A2E] disabled:cursor-not-allowed disabled:bg-[#E7E4DC] disabled:text-[#A8A29E]"
+              className="mt-8 w-full cursor-pointer rounded-full bg-[#1C1917] py-4 text-sm font-semibold uppercase tracking-widest text-white transition-colors hover:bg-[#B23A2E] disabled:cursor-not-allowed disabled:bg-[#E7E4DC] disabled:text-[#A8A29E]"
             >
               {currentStock === 0 ? "Out of Stock" : "Add to Bag"}
             </button>

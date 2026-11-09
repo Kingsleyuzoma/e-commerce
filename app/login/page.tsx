@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/config/firebase"; 
@@ -9,7 +8,7 @@ import { useAuth } from "@/Context/AuthContext";
 import { FcGoogle } from "react-icons/fc";
 import Link from "next/link";
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -22,16 +21,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Helper function to set the middleware authorization cookie
   const setAuthCookie = () => {
     document.cookie = "user_session=authenticated_true; path=/; max-age=86400; SameSite=Strict";
   };
 
-  // Helper function to handle routing after successful authentication
   const handleRedirect = () => {
     const redirectTo = searchParams.get("redirect") || "/";
     router.push(redirectTo);
-    router.refresh(); // Tells Next.js to immediately re-evaluate the middleware state
+    router.refresh();
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,11 +42,7 @@ export default function LoginPage() {
     
     try {
       await login(formData.email, formData.password);
-      
-      // 🍪 Set the secure session cookie for Next middleware tracking
       setAuthCookie();
-      
-      // 🗺️ Redirect to intended target destination
       handleRedirect();
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please check your credentials.");
@@ -62,11 +55,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await signInWithPopup(auth, googleProvider);
-      
-      // 🍪 Set the secure session cookie for Next middleware tracking
       setAuthCookie();
-      
-      // 🗺️ Redirect to intended target destination
       handleRedirect();
     } catch (error) {
       console.error("Google login failed:", error);
@@ -152,5 +141,13 @@ export default function LoginPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500 text-sm">Loading...</div>}>
+      <LoginFormContent />
+    </Suspense>
   );
 }
