@@ -501,8 +501,8 @@ export default function CheckoutPage() {
                   <div key={idx} className="flex gap-3 py-3 items-center">
                     <div className="relative w-10 h-10 shrink-0">
                       <Image 
-                        src={item.product.imageUrl} 
-                        alt={item.product.name} 
+                        src={item.product.imageUrl || "/placeholder.png"} 
+                        alt={item.product.name || "product image"} 
                         fill
                         sizes="40px"
                         className="rounded-md object-cover border"
