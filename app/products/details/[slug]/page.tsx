@@ -166,7 +166,7 @@ export default function ProductDetailsPage(props: PageProps) {
   name: product.name,
   brand: product.brand,
   price: product.price,
-  salePrice: product.salePrice,
+  salePrice: (product as any).salePrice,
   imageUrl: product.imageUrl,
   description: product.description || "", // 👈 Add this
   category: product.category || "",       // 👈 Add this
