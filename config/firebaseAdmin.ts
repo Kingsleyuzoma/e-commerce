@@ -23,6 +23,9 @@ export function getAuth() {
   return getAdminAuthInstance();
 }
 
+// 👈 Add this alias export so imports looking for getAdminAuth will succeed
+export const getAdminAuth = getAuth;
+
 export function getFirestore() {
   initFirebaseAdmin();
   return getAdminFirestore();
