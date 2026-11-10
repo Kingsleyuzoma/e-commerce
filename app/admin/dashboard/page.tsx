@@ -8,45 +8,60 @@ import CategoryManager from "@/Components/CategoryManager";
 import CustomerAnalytics from "@/app/admin/Components/CustomerAnalytics";
 import LowStockAlerts from "@/app/admin/Components/LowStockAlerts";
 import AdminMessagesPage from "@/app/admin/messages/page";
-
 import { auth, db } from "@/config/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, collection, query, where, onSnapshot, orderBy, limit, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot, orderBy, limit, getDocs, deleteDoc } from "firebase/firestore";
 
 interface Visitor {
   id: string;
-  timestamp: any;
+  createdAt?: any;
+  timestamp?: any;
   path: string;
   location?: string;
   country?: string;
   city?: string;
   userAgent: string;
-  referrer: string;
+  referrer?: string;
 }
 
 function AdminVisitorSection() {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Real-time listener for live visitor traffic & deletion handling
   useEffect(() => {
-    const fetchVisitors = async () => {
-      try {
-        const q = query(collection(db, "visitors"), orderBy("timestamp", "desc"), limit(50));
-        const snapshot = await getDocs(q);
+    const q = query(collection(db, "visitors"), orderBy("createdAt", "desc"), limit(50));
+    
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
         const visitorList = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Visitor[];
+        
         setVisitors(visitorList);
-      } catch (error) {
-        console.error("Error fetching visitors:", error);
-      } finally {
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching live visitors:", error);
         setLoading(false);
       }
-    };
+    );
 
-    fetchVisitors();
+    return () => unsubscribe();
   }, []);
+
+  const handleDeleteVisitor = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this visitor log?")) return;
+    try {
+      await deleteDoc(doc(db, "visitors", id));
+      // State updates automatically via onSnapshot!
+    } catch (error) {
+      console.error("Failed to delete visitor log:", error);
+      alert("Failed to delete log.");
+    }
+  };
 
   if (loading) {
     return <div className="p-6 text-sm text-gray-500">Loading live visitor logs...</div>;
@@ -57,10 +72,10 @@ function AdminVisitorSection() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-bold text-gray-900">Live Visitor Traffic</h3>
-          <p className="text-xs text-gray-500">Recent visitor activity and geographical data from your store</p>
+          <p className="text-xs text-gray-500">Real-time visitor activity and geographical data from your store</p>
         </div>
-        <span className="px-3 py-1 bg-green-50 text-green-600 text-xs font-semibold rounded-full">
-          {visitors.length} Recent Logs
+        <span className="px-3 py-1 bg-green-50 text-green-600 text-xs font-semibold rounded-full animate-pulse">
+          ● Live Tracking Active ({visitors.length})
         </span>
       </div>
 
@@ -71,26 +86,41 @@ function AdminVisitorSection() {
               <th className="p-3.5">Time</th>
               <th className="p-3.5">Location</th>
               <th className="p-3.5">Page Visited</th>
-              <th className="p-3.5">Referrer</th>
               <th className="p-3.5">Device</th>
+              <th className="p-3.5 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {visitors.map((v) => (
-              <tr key={v.id} className="hover:bg-gray-50/55 transition-colors">
-                <td className="p-3.5 whitespace-nowrap text-xs text-gray-500">
-                  {v.timestamp?.toDate ? v.timestamp.toDate().toLocaleString() : "Just now"}
-                </td>
-                <td className="p-3.5 whitespace-nowrap font-medium text-gray-900">
-                  {v.city && v.country ? `${v.city}, ${v.country}` : v.country || v.location || "Unknown"}
-                </td>
-                <td className="p-3.5 text-pink-600 font-medium">{v.path}</td>
-                <td className="p-3.5 truncate max-w-50 text-xs text-gray-500">{v.referrer}</td>
-                <td className="p-3.5 truncate max-w-45 text-xs text-gray-400">
-                  {v.userAgent}
-                </td>
-              </tr>
-            ))}
+            {visitors.map((v) => {
+              const displayDate = v.createdAt?.toDate
+                ? v.createdAt.toDate().toLocaleString()
+                : v.timestamp?.toDate
+                ? v.timestamp.toDate().toLocaleString()
+                : "Just now";
+
+              return (
+                <tr key={v.id} className="hover:bg-gray-50/55 transition-colors">
+                  <td className="p-3.5 whitespace-nowrap text-xs text-gray-500">
+                    {displayDate}
+                  </td>
+                  <td className="p-3.5 whitespace-nowrap font-medium text-gray-900">
+                    {v.city && v.country ? `${v.city}, ${v.country}` : v.country || v.location || "Unknown"}
+                  </td>
+                  <td className="p-3.5 text-pink-600 font-medium">{v.path || "/"}</td>
+                  <td className="p-3.5 truncate max-w-45 text-xs text-gray-400">
+                    {v.userAgent || "Unknown Device"}
+                  </td>
+                  <td className="p-3.5 text-right whitespace-nowrap">
+                    <button
+                      onClick={() => handleDeleteVisitor(v.id)}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
             {visitors.length === 0 && (
               <tr>
                 <td colSpan={5} className="text-center py-8 text-gray-400 text-sm">
