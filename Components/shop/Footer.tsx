@@ -126,7 +126,7 @@ export default function Footer() {
           {/* Payment Badges */}
           <div className="flex items-center gap-2">
             <span className="text-xxs uppercase tracking-widest text-gray-600 mr-2">Secure Payments:</span>
-            <div className="flex gap-1.5 opacity-60">
+            <div className="flex gap-1.5 md:opacity-60">
               <span className="bg-gray-900 text-xxs text-gray-400 px-2 py-1 rounded font-semibold border border-gray-800">VISA</span>
               <span className="bg-gray-900 text-xxs text-gray-400 px-2 py-1 rounded font-semibold border border-gray-800">MC</span>
               <span className="bg-gray-900 text-xxs text-gray-400 px-2 py-1 rounded font-semibold border border-gray-800">AMEX</span>
