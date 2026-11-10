@@ -33,7 +33,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-gray-950 text-gray-400 font-sans mt-auto border-t border-gray-900">
+    <footer className="md:bg-gray-950 text-gray-400 font-sans mt-auto border-t border-gray-900">
       
       {/* 🌟 Main Content Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
