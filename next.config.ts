@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  transpilePackages: ['jose', 'jwks-rsa'],
+  // REMOVED transpilePackages from here
   serverExternalPackages: ['firebase-admin'],
 };
 
