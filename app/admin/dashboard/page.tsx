@@ -11,7 +11,99 @@ import AdminMessagesPage from "@/app/admin/messages/page";
 
 import { auth, db } from "@/config/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot, orderBy, limit, getDocs } from "firebase/firestore";
+
+interface Visitor {
+  id: string;
+  timestamp: any;
+  path: string;
+  location?: string;
+  country?: string;
+  city?: string;
+  userAgent: string;
+  referrer: string;
+}
+
+function AdminVisitorSection() {
+  const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchVisitors = async () => {
+      try {
+        const q = query(collection(db, "visitors"), orderBy("timestamp", "desc"), limit(50));
+        const snapshot = await getDocs(q);
+        const visitorList = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Visitor[];
+        setVisitors(visitorList);
+      } catch (error) {
+        console.error("Error fetching visitors:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVisitors();
+  }, []);
+
+  if (loading) {
+    return <div className="p-6 text-sm text-gray-500">Loading live visitor logs...</div>;
+  }
+
+  return (
+    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm mt-2">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Live Visitor Traffic</h3>
+          <p className="text-xs text-gray-500">Recent visitor activity and geographical data from your store</p>
+        </div>
+        <span className="px-3 py-1 bg-green-50 text-green-600 text-xs font-semibold rounded-full">
+          {visitors.length} Recent Logs
+        </span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm text-gray-600">
+          <thead className="bg-gray-50 text-gray-700 uppercase text-[11px] tracking-wider">
+            <tr>
+              <th className="p-3.5">Time</th>
+              <th className="p-3.5">Location</th>
+              <th className="p-3.5">Page Visited</th>
+              <th className="p-3.5">Referrer</th>
+              <th className="p-3.5">Device</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {visitors.map((v) => (
+              <tr key={v.id} className="hover:bg-gray-50/55 transition-colors">
+                <td className="p-3.5 whitespace-nowrap text-xs text-gray-500">
+                  {v.timestamp?.toDate ? v.timestamp.toDate().toLocaleString() : "Just now"}
+                </td>
+                <td className="p-3.5 whitespace-nowrap font-medium text-gray-900">
+                  {v.city && v.country ? `${v.city}, ${v.country}` : v.country || v.location || "Unknown"}
+                </td>
+                <td className="p-3.5 text-pink-600 font-medium">{v.path}</td>
+                <td className="p-3.5 truncate max-w-50 text-xs text-gray-500">{v.referrer}</td>
+                <td className="p-3.5 truncate max-w-45 text-xs text-gray-400">
+                  {v.userAgent}
+                </td>
+              </tr>
+            ))}
+            {visitors.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-center py-8 text-gray-400 text-sm">
+                  No visitor logs found yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboardHome() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -165,6 +257,17 @@ export default function AdminDashboardHome() {
           >
             👥 Customer Insights & Analytics
           </Link>
+
+          <Link
+            href="/admin/dashboard?tab=visitors"
+            className={`px-4 py-2 rounded-xl text-lg font-bold transition-all ${
+              activeTab === "visitors"
+                ? "bg-gray-900 text-white shadow-sm"
+                : "bg-white text-purple-600 hover:bg-gray-100 border border-gray-200"
+            }`}
+          >
+            🌐 Live Visitors
+          </Link>
         </div>
 
         {/* Dynamic Tab Content */}
@@ -184,6 +287,12 @@ export default function AdminDashboardHome() {
             <div className="bg-green-100 p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
               <h2 className="text-lg font-bold text-gray-900">Top Spenders and Repeat Buyers</h2>
               <CustomerAnalytics />
+            </div>
+          )}
+
+          {activeTab === "visitors" && (
+            <div className="bg-purple-50 p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+              <AdminVisitorSection />
             </div>
           )}
 
