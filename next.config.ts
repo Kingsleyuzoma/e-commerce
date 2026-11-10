@@ -5,14 +5,15 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
+        hostname: '://googleapis.com',
         port: '',
         pathname: '/**',
       },
     ],
   },
-  // REMOVED transpilePackages from here
-  serverExternalPackages: ['firebase-admin'],
+  // Tell Next.js 15 to completely skip compiling both of these on the server
+  serverExternalPackages: ['firebase-admin', 'jwks-rsa'],
 };
 
 export default nextConfig;
+
